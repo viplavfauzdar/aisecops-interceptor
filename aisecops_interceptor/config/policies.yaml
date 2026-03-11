@@ -1,0 +1,35 @@
+blocked_tools:
+  - delete_database
+  - shell_exec
+
+monitored_tools:
+  - send_email
+  - create_incident
+
+dangerous_argument_patterns:
+  - drop table
+  - api_key
+  - ignore previous instructions
+  - rm -rf
+
+agents:
+  sales_agent:
+    allowed_tools:
+      - read_customer
+      - send_email
+
+  ops_agent:
+    allowed_tools:
+      - get_deployment_status
+      - create_incident
+      - restart_service
+    approval_required_tools:
+      - restart_service
+
+  openclaw_agent:
+    allowed_tools:
+      - get_deployment_status
+      - create_incident
+      - restart_service
+    approval_required_tools:
+      - restart_service
