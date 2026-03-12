@@ -146,6 +146,7 @@ It can also emit structured LLM-stage security events (`prompt_allowed`, `prompt
 `RuntimeContext` also carries optional source and sensitivity metadata (`source`, `data_classification`, `sensitivity_level`) for downstream security workflows and policy decisions.
 
 Runtime events can be persisted to JSONL and retrieved through the API for downstream analysis or audit review.
+The `/audit` endpoint supports optional query parameters: `event_type`, `stage`, `agent_name`, `tool_name`, `correlation_id`, and `limit`.
 
 Security violations raise:
 

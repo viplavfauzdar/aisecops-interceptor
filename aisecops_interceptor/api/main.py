@@ -72,6 +72,7 @@ class OpenClawExecuteRequest(BaseModel):
     tool_name: str
     arguments: dict = Field(default_factory=dict)
     approval_id: str | None = None
+    correlation_id: str | None = None
 
 
 @app.get("/health")
@@ -135,5 +136,22 @@ def execute_openclaw(request: OpenClawExecuteRequest) -> dict:
 
 
 @app.get("/audit")
-def get_audit() -> list[dict]:
-    return [event.to_dict() for event in audit.persisted_events()]
+def get_audit(
+    event_type: str | None = None,
+    stage: str | None = None,
+    agent_name: str | None = None,
+    tool_name: str | None = None,
+    correlation_id: str | None = None,
+    limit: int | None = None,
+) -> list[dict]:
+    return [
+        event.to_dict()
+        for event in audit.query_persisted_events(
+            event_type=event_type,
+            stage=stage,
+            agent_name=agent_name,
+            tool_name=tool_name,
+            correlation_id=correlation_id,
+            limit=limit,
+        )
+    ]

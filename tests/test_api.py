@@ -50,3 +50,74 @@ def test_approval_flow_serializes_pending_requests() -> None:
         event["approval_id"] == approval_id and event["event_type"] == "approval_required"
         for event in audit_response.json()
     )
+
+
+def test_audit_endpoint_filters_by_event_type() -> None:
+    response = client.post(
+        "/execute",
+        json={
+            "agent_name": "sales_agent",
+            "tool_name": "read_customer",
+            "arguments": {"customer_id": "123"},
+        },
+    )
+    assert response.status_code == 200
+
+    audit_response = client.get("/audit", params={"event_type": "tool_executed"})
+    assert audit_response.status_code == 200
+    events = audit_response.json()
+    assert events
+    assert all(event["event_type"] == "tool_executed" for event in events)
+
+
+def test_audit_endpoint_filters_by_stage() -> None:
+    response = client.post(
+        "/execute",
+        json={
+            "agent_name": "sales_agent",
+            "tool_name": "read_customer",
+            "arguments": {"customer_id": "123"},
+        },
+    )
+    assert response.status_code == 200
+
+    audit_response = client.get("/audit", params={"stage": "tool"})
+    assert audit_response.status_code == 200
+    events = audit_response.json()
+    assert events
+    assert all(event["stage"] == "tool" for event in events)
+
+
+def test_audit_endpoint_filters_by_correlation_id() -> None:
+    response = client.post(
+        "/openclaw/execute",
+        json={
+            "agent_name": "openclaw_agent",
+            "tool_name": "get_deployment_status",
+            "arguments": {"service": "payments"},
+            "correlation_id": "corr-api-1",
+        },
+    )
+    assert response.status_code == 200
+
+    audit_response = client.get("/audit", params={"correlation_id": "corr-api-1"})
+    assert audit_response.status_code == 200
+    events = audit_response.json()
+    assert events
+    assert all(event["correlation_id"] == "corr-api-1" for event in events)
+
+
+def test_audit_endpoint_applies_limit() -> None:
+    response = client.post(
+        "/execute",
+        json={
+            "agent_name": "sales_agent",
+            "tool_name": "read_customer",
+            "arguments": {"customer_id": "123"},
+        },
+    )
+    assert response.status_code == 200
+
+    audit_response = client.get("/audit", params={"limit": 1})
+    assert audit_response.status_code == 200
+    assert len(audit_response.json()) == 1

@@ -34,3 +34,26 @@ class AuditLogger:
                     continue
                 events.append(RuntimeEvent.from_dict(json.loads(line)))
         return tuple(events)
+
+    def query_persisted_events(
+        self,
+        *,
+        event_type: str | None = None,
+        stage: str | None = None,
+        agent_name: str | None = None,
+        tool_name: str | None = None,
+        correlation_id: str | None = None,
+        limit: int | None = None,
+    ) -> Iterable[RuntimeEvent]:
+        events = list(self.persisted_events())
+        filtered = [
+            event for event in events
+            if (event_type is None or event.event_type == event_type)
+            and (stage is None or event.stage == stage)
+            and (agent_name is None or event.agent_name == agent_name)
+            and (tool_name is None or event.tool_name == tool_name)
+            and (correlation_id is None or event.correlation_id == correlation_id)
+        ]
+        if limit is not None:
+            return tuple(filtered[:limit])
+        return tuple(filtered)

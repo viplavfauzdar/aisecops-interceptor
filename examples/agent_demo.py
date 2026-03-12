@@ -155,6 +155,10 @@ async def main() -> None:
     for event in audit_logger.persisted_events():
         print({"event_type": event.event_type, "stage": event.stage, "tool_name": event.tool_name})
 
+    print("\n6) Filtered persisted runtime events")
+    for event in audit_logger.query_persisted_events(stage="tool", tool_name="restart_service"):
+        print({"event_type": event.event_type, "stage": event.stage, "tool_name": event.tool_name})
+
 
 if __name__ == "__main__":
     asyncio.run(main())

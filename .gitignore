@@ -24,6 +24,26 @@ pip-wheel-metadata/
 .coverage.*
 htmlcov/
 
+# Environment / secrets
+.env
+.env.*
+*.env
+
+# Logs
+*.log
+logs/
+
+# Python environment metadata
+.python-version
+
+# Notebook artifacts
+.ipynb_checkpoints/
+
+# Local databases / temp data
+*.db
+*.sqlite
+*.sqlite3
+
 # Local runtime data
 audit/*.jsonl
 
