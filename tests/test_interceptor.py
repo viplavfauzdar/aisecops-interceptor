@@ -26,6 +26,22 @@ def make_interceptor() -> AgentInterceptor:
     return AgentInterceptor(policy_engine=policy, audit_logger=AuditLogger(), approval_store=ApprovalStore())
 
 
+def make_sensitivity_interceptor() -> AgentInterceptor:
+    policy = PolicyEngine(
+        {
+            "data_classification": {
+                "blocked_sensitivity_levels": ["high"],
+            },
+            "agents": {
+                "sales_agent": {
+                    "allowed_tools": ["read_customer"],
+                },
+            },
+        }
+    )
+    return AgentInterceptor(policy_engine=policy, audit_logger=AuditLogger(), approval_store=ApprovalStore())
+
+
 def test_allows_permitted_tool_call() -> None:
     interceptor = make_interceptor()
     result = interceptor.execute(
@@ -100,3 +116,25 @@ def test_intercept_supports_runtime_context_contract() -> None:
     )
     result = interceptor.intercept(request)
     assert result == {"customer_id": "456"}
+
+
+def test_intercept_blocks_high_sensitivity_context_end_to_end() -> None:
+    interceptor = make_sensitivity_interceptor()
+    request = InterceptionRequest(
+        context=RuntimeContext(
+            agent_name="sales_agent",
+            tool_name="read_customer",
+            arguments={"customer_id": "456"},
+            framework="langgraph",
+            sensitivity_level="high",
+            source="crm",
+            data_classification="pii",
+        ),
+        tool_registry={"read_customer": lambda customer_id: {"customer_id": customer_id}},
+    )
+
+    try:
+        interceptor.intercept(request)
+        assert False, "Expected PolicyViolationError"
+    except PolicyViolationError as exc:
+        assert "Sensitivity level 'high' is blocked by policy" in str(exc)

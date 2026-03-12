@@ -1,25 +1,30 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
-
-import yaml
 
 from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.models import PolicyDecision, ToolCall
+from aisecops_interceptor.policy.loader import PolicyLoader
 from aisecops_interceptor.policy.rule_engine import RuleEngine
 from aisecops_interceptor.policy.rules import Rule
+from aisecops_interceptor.policy.schema import parse_policy_bundle
 
 
 class PolicyEngine:
     def __init__(self, config: dict[str, Any], rules: list[Rule] | None = None) -> None:
-        self.config = config
-        self.rule_engine = RuleEngine(rules or self._load_rules(config))
+        bundle = parse_policy_bundle(config)
+        resolved_rules = rules if rules is not None else bundle.rules
+        self.config = bundle.config
+        self.rule_engine = RuleEngine(resolved_rules)
+
+    @classmethod
+    def from_yaml(cls, path: str) -> "PolicyEngine":
+        bundle = PolicyLoader.from_yaml(path)
+        return cls(bundle.config, rules=bundle.rules)
 
     @classmethod
     def from_yaml_file(cls, path: str) -> "PolicyEngine":
-        data = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
-        return cls(data or {})
+        return cls.from_yaml(path)
 
     def evaluate(
         self,
@@ -105,22 +110,3 @@ class PolicyEngine:
         if isinstance(data, list):
             return any(self._arguments_contain(v, needle) for v in data)
         return needle in str(data).lower()
-
-    def _load_rules(self, config: dict[str, Any]) -> list[Rule]:
-        loaded_rules: list[Rule] = []
-        for item in config.get("rules", []):
-            if not isinstance(item, dict):
-                continue
-            loaded_rules.append(
-                Rule(
-                    tool_name=str(item["tool_name"]),
-                    action=str(item["action"]),
-                    agent_name=str(item["agent_name"]) if item.get("agent_name") is not None else None,
-                    sensitivity_level=(
-                        str(item["sensitivity_level"])
-                        if item.get("sensitivity_level") is not None
-                        else None
-                    ),
-                )
-            )
-        return loaded_rules

@@ -12,7 +12,7 @@ The project has evolved from an early proof‑of‑concept into the **core of a 
 
 AISecOps Interceptor enforces security and policy at **two critical layers of agentic AI systems**:
 
-1. **Prompt layer protection** (before an LLM is called)
+1. **Prompt layer protection** (before a large language model (LLM) is called)
 2. **Tool execution protection** (before a tool or API is executed)
 
 This ensures:
@@ -35,6 +35,7 @@ Current implementation includes:
 - Runtime context propagation
 - Policy evaluation
 - Optional declarative rule engine
+- YAML policy bundles with validation
 - Decision engine + execution gate
 - Human approval workflow
 - Structured audit logging
@@ -61,9 +62,8 @@ Current implementation includes:
 ### Developer tooling
 
 - FastAPI runtime wrapper
-- Demo scripts (`agent_demo`, `langgraph_style_demo`, `openclaw_demo`)
+- Demo scripts (`agent_demo`, `demo.py`, `langgraph_style_demo`, `openclaw_demo`)
 - Full pytest test suite
-- Architecture review captured in `codex-review.txt`
 
 ---
 
@@ -191,7 +191,7 @@ Each rule supports:
 - `sensitivity_level` (optional)
 - `action`: `allow`, `block`, or `require_approval`
 
-If rules are provided, the first matching rule wins and overrides the default policy behavior. If no rule matches, the existing blocked-tool, dangerous-argument, allowlist, approval, and monitored-tool logic still applies.
+If rules are provided, the first matching rule wins and overrides the default policy behavior. If no rule matches, the existing blocked-tool, dangerous-argument, allowlist, approval, and monitored-tool logic still applies. The current test suite covers allow, block, require-approval, and sensitivity-based rule evaluation.
 
 Example:
 
@@ -205,6 +205,40 @@ policy = PolicyEngine(
     }
 )
 ```
+
+---
+
+# Policy bundles
+
+Declarative rules can also be loaded from YAML bundles instead of Python dictionaries.
+
+Example bundle:
+
+```yaml
+rules:
+  - tool_name: restart_service
+    agent_name: ops_agent
+    action: require_approval
+
+  - tool_name: read_customer
+    sensitivity_level: high
+    action: block
+```
+
+Supported rule fields:
+
+- `tool_name` (required)
+- `action` (required): `allow`, `block`, or `require_approval`
+- `agent_name` (optional)
+- `sensitivity_level` (optional)
+
+Load a bundle with:
+
+```python
+policy = PolicyEngine.from_yaml("policies/production.yaml")
+```
+
+YAML bundles are validated before rules are constructed, and invalid bundles raise a validation error.
 
 ---
 
@@ -244,6 +278,12 @@ aisecops_interceptor/
       openai_client.py
       anthropic_client.py
 
+  policy/
+    rules.py
+    rule_engine.py
+    schema.py
+    loader.py
+
   integrations/
     langgraph_adapter.py
     openclaw_adapter.py
@@ -255,8 +295,11 @@ examples/
   demo.py
   langgraph_style_demo.py
   openclaw_demo.py
+  policy_bundle_demo.py
 
 tests/
+  test_policy_engine.py
+  test_policy_loader.py
 ```
 
 ---
@@ -321,6 +364,7 @@ I --> J[Audit Event]
 ```
 
 This diagram shows the **tool-execution governance path** after prompt and output checks have already completed.
+Policy decisions in this flow may come from declarative rules or from the fallback config-driven policy logic.
 
 ---
 
@@ -345,6 +389,7 @@ python -m examples.agent_demo
 python examples/demo.py
 python -m examples.langgraph_style_demo
 python examples/openclaw_demo.py
+python -m examples.policy_bundle_demo
 ```
 
 ---
@@ -356,6 +401,8 @@ Current tests validate:
 - prompt injection detection
 - secret detection in model output
 - guarded LLM pipeline behavior
+- declarative rule-based policy evaluation
+- YAML policy bundle loading and validation
 - provider factory behavior
 - interceptor decisions and approval flow
 - runtime context and execution gate behavior
@@ -434,14 +481,13 @@ The objective is a portable runtime capable of securing:
 
 Current state:
 
-Working runtime core + guarded LLM pipeline + interceptor enforcement + end-to-end demo coverage.
+Working runtime core + guarded LLM pipeline + interceptor enforcement + declarative rule engine + end-to-end demo coverage.
 
 Current engineering focus:
 
-- unify duplicated runtime contracts
-- pass runtime context consistently across LLM and tool paths
-- strengthen policy evaluation with sensitivity metadata
-- enrich structured audit/event models
+- expand declarative policy coverage while keeping fallback policy behavior simple
+- strengthen policy evaluation with richer runtime metadata
+- improve audit and event visibility across prompt and tool execution stages
 - keep adapters thin while improving real framework integrations
 
 ---

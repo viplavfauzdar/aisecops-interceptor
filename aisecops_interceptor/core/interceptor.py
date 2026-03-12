@@ -30,7 +30,7 @@ class AgentInterceptor:
     def intercept(self, request: InterceptionRequest) -> Any:
         context = request.context
         tool_call = context.to_tool_call()
-        decision = self.evaluate(agent_name=context.agent_name, tool_call=tool_call)
+        decision = self.evaluate(agent_name=context.agent_name, tool_call=tool_call, context=context)
 
         if decision.requires_approval and not self.approval_store.is_approved(request.approval_id):
             approval_request = self.approval_store.create_request(
@@ -99,8 +99,14 @@ class AgentInterceptor:
             **context.arguments,
         )
 
-    def evaluate(self, *, agent_name: str, tool_call: ToolCall):
-        return self.policy_engine.evaluate(agent_name=agent_name, tool_call=tool_call)
+    def evaluate(
+        self,
+        *,
+        agent_name: str,
+        tool_call: ToolCall,
+        context: RuntimeContext | None = None,
+    ):
+        return self.policy_engine.evaluate(agent_name=agent_name, tool_call=tool_call, context=context)
 
     def execute(
         self,

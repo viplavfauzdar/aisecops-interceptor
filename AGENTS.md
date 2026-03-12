@@ -12,7 +12,8 @@ These instructions apply to the repository rooted at `/Users/viplavfauzdar/Proje
 ## Architecture rules
 - `aisecops_interceptor/core/context.py` is the single canonical home of `RuntimeContext`.
 - Do not introduce another `RuntimeContext` definition anywhere else.
-- `aisecops_interceptor/core/models.py` contains shared runtime dataclasses such as `ToolCall`, `InterceptionRequest`, `PolicyDecision`, `ApprovalRequest`, and the persisted `AuditEvent`.
+- `aisecops_interceptor/core/models.py` contains shared runtime dataclasses such as `ToolCall`, `InterceptionRequest`, `PolicyDecision`, and `ApprovalRequest`.
+- `aisecops_interceptor/core/events.py` is the canonical home of `AuditEvent` and other runtime event models.
 - Do not refactor `AuditEvent` naming or event-model boundaries unless the task explicitly asks for it.
 - Preserve the current approval flow shape: policy decides, interceptor handles approval orchestration, execution gate stays minimal.
 
@@ -73,6 +74,22 @@ When modifying core runtime logic also verify:
 - Prefer `rg` for code search.
 - Update README only when behavior or public usage actually changes.
 - Avoid expanding scope into packaging, dependency cleanup, or event-model redesign unless explicitly requested.
+
+### Git workflow
+- After completing a task that satisfies the acceptance criteria, create a **local commit** summarizing the change.
+- Do **not push automatically** unless explicitly instructed by the user.
+- Use small, focused commit messages that reflect the architectural step completed.
+
+Recommended pattern:
+
+```
+git add -A
+git commit -m "<short description of completed step>"
+```
+
+Pushes should normally occur only after a logical milestone (for example: context unification, policy changes, interceptor changes, etc.).
+
+If a task only inspects or verifies the codebase and does not modify files, **do not create a commit**.
 
 ## Response expectations
 - When work is complete, report:
