@@ -39,6 +39,7 @@ Current implementation includes:
 - Decision engine + execution gate
 - Human approval workflow
 - Structured runtime event logging with JSONL persistence
+- Optional multi-sink runtime event emission
 
 ### LLM security layer
 
@@ -147,6 +148,7 @@ It can also emit structured LLM-stage security events (`prompt_allowed`, `prompt
 
 Runtime events can be persisted to JSONL and retrieved through the API for downstream analysis or audit review.
 The `/audit` endpoint supports optional query parameters: `event_type`, `stage`, `agent_name`, `tool_name`, `correlation_id`, and `limit`.
+`AuditLogger` can also emit the same `RuntimeEvent` records to multiple sinks, such as JSONL persistence and additional in-memory or external streaming adapters.
 
 Security violations raise:
 

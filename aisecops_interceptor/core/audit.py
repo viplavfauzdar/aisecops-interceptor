@@ -1,39 +1,36 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import Iterable
 
+from aisecops_interceptor.core.event_sink import FileEventSink, InMemoryEventSink
 from aisecops_interceptor.core.events import RuntimeEvent
 
 
 class AuditLogger:
-    def __init__(self, log_path: str | None = None) -> None:
-        self._events: list[RuntimeEvent] = []
-        self.log_path = Path(log_path) if log_path else None
+    def __init__(
+        self,
+        log_path: str | None = None,
+        sinks: list[InMemoryEventSink | FileEventSink] | None = None,
+    ) -> None:
+        self.in_memory_sink = InMemoryEventSink()
+        self.file_sink = FileEventSink(log_path) if log_path else None
+        self.sinks = [self.in_memory_sink]
+        if self.file_sink is not None:
+            self.sinks.append(self.file_sink)
+        if sinks:
+            self.sinks.extend(sinks)
 
     def log(self, event: RuntimeEvent) -> None:
-        self._events.append(event)
-        if self.log_path:
-            self.log_path.parent.mkdir(parents=True, exist_ok=True)
-            with self.log_path.open("a", encoding="utf-8") as f:
-                f.write(json.dumps(event.to_dict()) + "\n")
+        for sink in self.sinks:
+            sink.emit(event)
 
     def events(self) -> Iterable[RuntimeEvent]:
-        return tuple(self._events)
+        return self.in_memory_sink.events()
 
     def persisted_events(self) -> Iterable[RuntimeEvent]:
-        if self.log_path is None or not self.log_path.exists():
+        if self.file_sink is None:
             return ()
-
-        events: list[RuntimeEvent] = []
-        with self.log_path.open("r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                events.append(RuntimeEvent.from_dict(json.loads(line)))
-        return tuple(events)
+        return self.file_sink.events()
 
     def query_persisted_events(
         self,
@@ -45,15 +42,13 @@ class AuditLogger:
         correlation_id: str | None = None,
         limit: int | None = None,
     ) -> Iterable[RuntimeEvent]:
-        events = list(self.persisted_events())
-        filtered = [
-            event for event in events
-            if (event_type is None or event.event_type == event_type)
-            and (stage is None or event.stage == stage)
-            and (agent_name is None or event.agent_name == agent_name)
-            and (tool_name is None or event.tool_name == tool_name)
-            and (correlation_id is None or event.correlation_id == correlation_id)
-        ]
-        if limit is not None:
-            return tuple(filtered[:limit])
-        return tuple(filtered)
+        if self.file_sink is None:
+            return ()
+        return self.file_sink.query_events(
+            event_type=event_type,
+            stage=stage,
+            agent_name=agent_name,
+            tool_name=tool_name,
+            correlation_id=correlation_id,
+            limit=limit,
+        )
