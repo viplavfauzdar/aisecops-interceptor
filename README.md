@@ -38,7 +38,7 @@ Current implementation includes:
 - YAML policy bundles with validation
 - Decision engine + execution gate
 - Human approval workflow
-- Structured audit logging
+- Structured runtime event logging with JSONL persistence
 
 ### LLM security layer
 
@@ -144,6 +144,8 @@ D --> E[LLMResponse]
 `GuardedLLMPipeline.chat(...)` can optionally accept a `RuntimeContext` and propagate it through LLM guard checks.
 It can also emit structured LLM-stage security events (`prompt_allowed`, `prompt_blocked`, `output_allowed`, `output_blocked`) through the same runtime event model used by tool execution and audit logging.
 `RuntimeContext` also carries optional source and sensitivity metadata (`source`, `data_classification`, `sensitivity_level`) for downstream security workflows and policy decisions.
+
+Runtime events can be persisted to JSONL and retrieved through the API for downstream analysis or audit review.
 
 Security violations raise:
 

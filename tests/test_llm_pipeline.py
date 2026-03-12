@@ -1,6 +1,7 @@
 import asyncio
 import pytest
 
+from aisecops_interceptor.core.audit import AuditLogger
 from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.events import RuntimeEvent
 from aisecops_interceptor.llm.models import LLMMessage, LLMRequest, LLMResponse
@@ -92,3 +93,18 @@ def test_pipeline_blocks_secret_like_output_with_runtime_context() -> None:
     assert events[1].decision == "blocked"
     assert isinstance(events[1], RuntimeEvent)
     assert events[1].context is context
+
+
+def test_pipeline_events_can_be_persisted_and_read_back(tmp_path) -> None:
+    logger = AuditLogger(log_path=str(tmp_path / "llm-events.jsonl"))
+    pipeline = GuardedLLMPipeline(client=FakeLLMClient("Safe response"), event_sink=logger.log)
+    request = LLMRequest(messages=[LLMMessage(role="user", content="Hello there")])
+    context = RuntimeContext(agent_name="demo-agent", user_id="user-1", session_id="sess-1")
+
+    response = asyncio.run(pipeline.chat(request, context=context))
+
+    assert response.content == "Safe response"
+    persisted = list(logger.persisted_events())
+    assert [event.event_type for event in persisted] == ["prompt_allowed", "output_allowed"]
+    assert all(isinstance(event, RuntimeEvent) for event in persisted)
+    assert persisted[0].context is not None

@@ -21,7 +21,10 @@ def test_execute_endpoint_allows_and_serializes_audit_event() -> None:
 
     audit_response = client.get("/audit")
     assert audit_response.status_code == 200
-    assert any(event["tool_name"] == "read_customer" for event in audit_response.json())
+    assert any(
+        event["tool_name"] == "read_customer" and event["event_type"] == "tool_executed"
+        for event in audit_response.json()
+    )
 
 
 def test_approval_flow_serializes_pending_requests() -> None:
@@ -40,3 +43,10 @@ def test_approval_flow_serializes_pending_requests() -> None:
     approvals_response = client.get("/approvals")
     assert approvals_response.status_code == 200
     assert any(item["approval_id"] == approval_id for item in approvals_response.json())
+
+    audit_response = client.get("/audit")
+    assert audit_response.status_code == 200
+    assert any(
+        event["approval_id"] == approval_id and event["event_type"] == "approval_required"
+        for event in audit_response.json()
+    )

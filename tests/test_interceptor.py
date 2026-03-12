@@ -180,3 +180,28 @@ def test_intercept_emits_approval_required_and_tool_executed_events() -> None:
         "tool_allowed",
         "tool_executed",
     ]
+
+
+def test_runtime_events_are_persisted_and_read_back(tmp_path) -> None:
+    logger = AuditLogger(log_path=str(tmp_path / "runtime-events.jsonl"))
+    policy = PolicyEngine(
+        {
+            "agents": {
+                "sales_agent": {
+                    "allowed_tools": ["read_customer"],
+                },
+            },
+        }
+    )
+    interceptor = AgentInterceptor(policy_engine=policy, audit_logger=logger, approval_store=ApprovalStore())
+
+    result = interceptor.execute(
+        agent_name="sales_agent",
+        tool_call=ToolCall(name="read_customer", arguments={"customer_id": "123"}),
+        tool_registry={"read_customer": lambda customer_id: {"customer_id": customer_id}},
+    )
+
+    assert result == {"customer_id": "123"}
+    persisted = list(logger.persisted_events())
+    assert [event.event_type for event in persisted] == ["tool_allowed", "tool_executed"]
+    assert all(isinstance(event, RuntimeEvent) for event in persisted)

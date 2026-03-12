@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
 from aisecops_interceptor.core.context import RuntimeContext
+from aisecops_interceptor.core.audit import AuditLogger
 from aisecops_interceptor.core.events import RuntimeEvent
 from aisecops_interceptor.core.exceptions import ApprovalRequiredError
 from aisecops_interceptor.core.interceptor import AgentInterceptor
@@ -14,14 +16,6 @@ from aisecops_interceptor.core.models import InterceptionRequest
 from aisecops_interceptor.core.policy import PolicyEngine
 from aisecops_interceptor.llm.models import LLMMessage, LLMRequest, LLMResponse
 from aisecops_interceptor.llm.pipeline import GuardedLLMPipeline
-
-
-class DemoAuditLogger:
-    def __init__(self) -> None:
-        self.events = []
-
-    def log(self, event) -> None:
-        self.events.append(event)
 
 
 class DemoApprovalStore:
@@ -59,7 +53,11 @@ def restart_service(service: str) -> dict[str, str]:
 
 
 async def main() -> None:
-    audit_logger = DemoAuditLogger()
+    audit_path = Path("audit/agent-demo-runtime-events.jsonl")
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    if audit_path.exists():
+        audit_path.unlink()
+    audit_logger = AuditLogger(log_path=str(audit_path))
     approval_store = DemoApprovalStore()
     policy_engine = PolicyEngine(
         {
@@ -139,7 +137,7 @@ async def main() -> None:
         print(result)
 
     print("\n4) Runtime events")
-    for event in audit_logger.events:
+    for event in audit_logger.events():
         if isinstance(event, RuntimeEvent):
             print(
                 {
@@ -152,6 +150,10 @@ async def main() -> None:
             )
         else:
             print(event)
+
+    print("\n5) Persisted runtime events")
+    for event in audit_logger.persisted_events():
+        print({"event_type": event.event_type, "stage": event.stage, "tool_name": event.tool_name})
 
 
 if __name__ == "__main__":

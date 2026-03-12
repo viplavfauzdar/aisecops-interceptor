@@ -136,4 +136,4 @@ def execute_openclaw(request: OpenClawExecuteRequest) -> dict:
 
 @app.get("/audit")
 def get_audit() -> list[dict]:
-    return [asdict(event) for event in audit.events()]
+    return [event.to_dict() for event in audit.persisted_events()]
