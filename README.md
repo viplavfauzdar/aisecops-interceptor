@@ -73,16 +73,17 @@ A[Agent Runtime / Framework]
 
 A --> B[Framework Adapter]
 
-B --> C[AISecOps Interceptor]
+B --> C[Runtime Context Builder]
 
-C --> D[Policy Evaluation]
-C --> E[Risk Classification]
-C --> F[Approval Manager]
-C --> G[Audit Logging]
+C --> D[AISecOps Interceptor]
 
-C --> H[Execution Gate]
+D --> E[Decision Engine]
 
-H --> I[Tool / API Execution]
+E --> F[Execution Gate]
+
+F --> G[Tool / API Execution]
+
+G --> H[Audit Event]
 ```
 
 Adapters are intentionally **thin**.
@@ -185,6 +186,10 @@ aisecops_interceptor/
     policy.py
     approval.py
     audit.py
+    context.py
+    decision.py
+    execution.py
+    events.py
 
   guard/
     detectors.py
@@ -219,6 +224,37 @@ tests/
 ```
 
 ---
+
+
+# Full AISecOps security pipeline
+
+This diagram shows the **complete runtime security flow** from prompt to tool execution.
+
+```mermaid
+flowchart TD
+
+A[User / Agent Prompt]
+
+A --> B[Prompt Guard]
+
+B --> C[Guarded LLM Pipeline]
+
+C --> D[Output Guard]
+
+D --> E[Runtime Context Builder]
+
+E --> F[AISecOps Interceptor]
+
+F --> G[Decision Engine]
+
+G --> H[Execution Gate]
+
+H --> I[Tool / API Execution]
+
+I --> J[Audit Event]
+```
+
+This makes it clear that **both prompt-layer threats and tool-execution risks are governed by the AISecOps runtime**.
 
 # Example runtime flow
 
