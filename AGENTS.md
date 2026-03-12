@@ -75,8 +75,7 @@ When modifying core runtime logic also verify:
 - Avoid expanding scope into packaging, dependency cleanup, or event-model redesign unless explicitly requested.
 
 ### Git workflow
-- After completing a task that satisfies the acceptance criteria, create a **local commit** summarizing the change.
-- Do **not push automatically** unless explicitly instructed by the user.
+- After completing a task that satisfies the acceptance criteria, stage **all current repository changes**, create a commit summarizing the change, and push the current branch unless the user says otherwise.
 - Use small, focused commit messages that reflect the architectural step completed.
 
 Recommended pattern:
@@ -84,9 +83,10 @@ Recommended pattern:
 ```
 git add -A
 git commit -m "<short description of completed step>"
+git push origin <current-branch>
 ```
 
-Pushes should normally occur only after a logical milestone (for example: context unification, policy changes, interceptor changes, etc.).
+Pushes should normally occur only after a logical milestone (for example: context unification, policy changes, interceptor changes, etc.), but once a milestone is complete the default is to push it.
 
 If a task only inspects or verifies the codebase and does not modify files, **do not create a commit**.
 
