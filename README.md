@@ -261,23 +261,27 @@ This makes it clear that **both prompt-layer threats and tool-execution risks ar
 ```mermaid
 flowchart TD
 
-A[User Prompt]
+A[Agent Tool Request]
 
-A --> B[Prompt Guard]
+A --> B[Runtime Context Builder]
 
-B --> C[LLM Pipeline]
+B --> C[AISecOps Interceptor]
 
-C --> D[Output Guard]
+C --> D[Decision Engine]
 
-D --> E[AISecOps Interceptor]
+D --> E{Decision}
 
-E --> F[Policy Decision]
+E -->|Allow| F[Execution Gate]
 
-F --> G[Allow / Block / Approval]
+E -->|Block| G[Reject Request]
 
-G --> H[Tool Execution]
+E -->|Require Approval| H[Approval Workflow]
 
-H --> I[Audit Event]
+H --> F
+
+F --> I[Tool / API Execution]
+
+I --> J[Audit Event]
 ```
 
 This architecture ensures both **prompt‑layer attacks** and **dangerous tool executions** are controlled.
