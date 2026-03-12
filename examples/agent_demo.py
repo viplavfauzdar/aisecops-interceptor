@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -11,37 +10,9 @@ from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.exceptions import ApprovalRequiredError
 from aisecops_interceptor.core.interceptor import AgentInterceptor
 from aisecops_interceptor.core.models import InterceptionRequest
+from aisecops_interceptor.core.policy import PolicyEngine
 from aisecops_interceptor.llm.models import LLMMessage, LLMRequest, LLMResponse
 from aisecops_interceptor.llm.pipeline import GuardedLLMPipeline
-
-
-@dataclass(slots=True)
-class DemoPolicyDecision:
-    allowed: bool
-    requires_approval: bool
-    reason: str
-    risk_level: int | None = None
-    matched_rule: str | None = None
-
-
-class DemoPolicyEngine:
-    def evaluate(self, *, agent_name: str, tool_call) -> DemoPolicyDecision:
-        if tool_call.name == "restart_service":
-            return DemoPolicyDecision(
-                allowed=False,
-                requires_approval=True,
-                reason="restart_service requires approval",
-                risk_level=3,
-                matched_rule="approval.restart_service",
-            )
-
-        return DemoPolicyDecision(
-            allowed=True,
-            requires_approval=False,
-            reason="allowed by demo policy",
-            risk_level=1,
-            matched_rule="allow.default",
-        )
 
 
 class DemoAuditLogger:
@@ -89,8 +60,19 @@ def restart_service(service: str) -> dict[str, str]:
 async def main() -> None:
     audit_logger = DemoAuditLogger()
     approval_store = DemoApprovalStore()
+    policy_engine = PolicyEngine(
+        {
+            "rules": [
+                {
+                    "tool_name": "restart_service",
+                    "agent_name": "ops_agent",
+                    "action": "require_approval",
+                }
+            ]
+        }
+    )
     interceptor = AgentInterceptor(
-        policy_engine=DemoPolicyEngine(),
+        policy_engine=policy_engine,
         audit_logger=audit_logger,
         approval_store=approval_store,
     )

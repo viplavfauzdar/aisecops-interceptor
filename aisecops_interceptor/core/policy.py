@@ -7,11 +7,14 @@ import yaml
 
 from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.models import PolicyDecision, ToolCall
+from aisecops_interceptor.policy.rule_engine import RuleEngine
+from aisecops_interceptor.policy.rules import Rule
 
 
 class PolicyEngine:
-    def __init__(self, config: dict[str, Any]) -> None:
+    def __init__(self, config: dict[str, Any], rules: list[Rule] | None = None) -> None:
         self.config = config
+        self.rule_engine = RuleEngine(rules or self._load_rules(config))
 
     @classmethod
     def from_yaml_file(cls, path: str) -> "PolicyEngine":
@@ -25,6 +28,14 @@ class PolicyEngine:
         tool_call: ToolCall,
         context: RuntimeContext | None = None,
     ) -> PolicyDecision:
+        rule_decision = self.rule_engine.evaluate(
+            agent_name=agent_name,
+            tool_call=tool_call,
+            context=context,
+        )
+        if rule_decision is not None:
+            return rule_decision
+
         classification_config = self.config.get("data_classification", {})
         blocked_sensitivity_levels = {
             str(level).lower() for level in classification_config.get("blocked_sensitivity_levels", [])
@@ -94,3 +105,22 @@ class PolicyEngine:
         if isinstance(data, list):
             return any(self._arguments_contain(v, needle) for v in data)
         return needle in str(data).lower()
+
+    def _load_rules(self, config: dict[str, Any]) -> list[Rule]:
+        loaded_rules: list[Rule] = []
+        for item in config.get("rules", []):
+            if not isinstance(item, dict):
+                continue
+            loaded_rules.append(
+                Rule(
+                    tool_name=str(item["tool_name"]),
+                    action=str(item["action"]),
+                    agent_name=str(item["agent_name"]) if item.get("agent_name") is not None else None,
+                    sensitivity_level=(
+                        str(item["sensitivity_level"])
+                        if item.get("sensitivity_level") is not None
+                        else None
+                    ),
+                )
+            )
+        return loaded_rules

@@ -34,6 +34,7 @@ Current implementation includes:
 - Interceptor core
 - Runtime context propagation
 - Policy evaluation
+- Optional declarative rule engine
 - Decision engine + execution gate
 - Human approval workflow
 - Structured audit logging
@@ -142,7 +143,7 @@ D --> E[LLMResponse]
 
 `GuardedLLMPipeline.chat(...)` can optionally accept a `RuntimeContext` and propagate it through LLM guard checks.
 It can also emit structured LLM-stage security events (`prompt_allowed`, `prompt_blocked`, `output_allowed`, `output_blocked`) through an optional event callback sink.
-`RuntimeContext` also carries optional source and sensitivity metadata (`source`, `data_classification`, `sensitivity_level`) for downstream security workflows.
+`RuntimeContext` also carries optional source and sensitivity metadata (`source`, `data_classification`, `sensitivity_level`) for downstream security workflows and policy decisions.
 
 Security violations raise:
 
@@ -175,6 +176,34 @@ The factory creates providers dynamically:
 
 ```
 create_llm_client(LLMConfig)
+```
+
+---
+
+# Rule-based policy
+
+`PolicyEngine` can evaluate an ordered set of declarative rules before falling back to the existing config-driven checks.
+
+Each rule supports:
+
+- `tool_name`
+- `agent_name` (optional)
+- `sensitivity_level` (optional)
+- `action`: `allow`, `block`, or `require_approval`
+
+If rules are provided, the first matching rule wins and overrides the default policy behavior. If no rule matches, the existing blocked-tool, dangerous-argument, allowlist, approval, and monitored-tool logic still applies.
+
+Example:
+
+```python
+policy = PolicyEngine(
+    {
+        "rules": [
+            {"tool_name": "restart_service", "agent_name": "ops_agent", "action": "require_approval"},
+            {"tool_name": "read_customer", "sensitivity_level": "high", "action": "block"},
+        ]
+    }
+)
 ```
 
 ---
