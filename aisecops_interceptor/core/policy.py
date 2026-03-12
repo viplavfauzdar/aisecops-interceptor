@@ -5,6 +5,7 @@ from typing import Any
 
 import yaml
 
+from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.models import PolicyDecision, ToolCall
 
 
@@ -17,7 +18,25 @@ class PolicyEngine:
         data = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
         return cls(data or {})
 
-    def evaluate(self, *, agent_name: str, tool_call: ToolCall) -> PolicyDecision:
+    def evaluate(
+        self,
+        *,
+        agent_name: str,
+        tool_call: ToolCall,
+        context: RuntimeContext | None = None,
+    ) -> PolicyDecision:
+        classification_config = self.config.get("data_classification", {})
+        blocked_sensitivity_levels = {
+            str(level).lower() for level in classification_config.get("blocked_sensitivity_levels", [])
+        }
+        if context and context.sensitivity_level and context.sensitivity_level.lower() in blocked_sensitivity_levels:
+            return PolicyDecision(
+                allowed=False,
+                reason=f"Sensitivity level '{context.sensitivity_level}' is blocked by policy",
+                matched_rule="data_classification.blocked_sensitivity_levels",
+                risk_level="high",
+            )
+
         blocked_tools = set(self.config.get("blocked_tools", []))
         if tool_call.name in blocked_tools:
             return PolicyDecision(

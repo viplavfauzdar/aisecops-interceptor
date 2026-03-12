@@ -5,7 +5,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Iterable
 
-from aisecops_interceptor.core.models import AuditEvent
+from aisecops_interceptor.core.events import AuditEvent
 
 
 class AuditLogger:

@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
-from typing import Optional, Dict, List
+from typing import Callable, Dict, List, Optional
+
+from aisecops_interceptor.core.events import LLMSecurityEvent
 
 
 @dataclass(slots=True)
@@ -22,3 +24,6 @@ class LLMResponse:
     content: str
     model: Optional[str] = None
     provider: Optional[str] = None
+
+
+LLMEventSink = Callable[[LLMSecurityEvent], None]

@@ -10,7 +10,7 @@ The project has evolved from an early proof‑of‑concept into the **core of a 
 
 # What the interceptor provides
 
-AISecOps Interceptor enforces security and policy at **two critical layers of AI systems**:
+AISecOps Interceptor enforces security and policy at **two critical layers of agentic AI systems**:
 
 1. **Prompt layer protection** (before an LLM is called)
 2. **Tool execution protection** (before a tool or API is executed)
@@ -32,8 +32,9 @@ Current implementation includes:
 ### Core runtime
 
 - Interceptor core
+- Runtime context propagation
 - Policy evaluation
-- Risk classification
+- Decision engine + execution gate
 - Human approval workflow
 - Structured audit logging
 
@@ -59,8 +60,9 @@ Current implementation includes:
 ### Developer tooling
 
 - FastAPI runtime wrapper
-- Demo scripts
+- Demo scripts (`agent_demo`, `langgraph_style_demo`, `openclaw_demo`)
 - Full pytest test suite
+- Architecture review captured in `codex-review.txt`
 
 ---
 
@@ -137,6 +139,10 @@ C --> D[Output Inspector]
 
 D --> E[LLMResponse]
 ```
+
+`GuardedLLMPipeline.chat(...)` can optionally accept a `RuntimeContext` and propagate it through LLM guard checks.
+It can also emit structured LLM-stage security events (`prompt_allowed`, `prompt_blocked`, `output_allowed`, `output_blocked`) through an optional event callback sink.
+`RuntimeContext` also carries optional source and sensitivity metadata (`source`, `data_classification`, `sensitivity_level`) for downstream security workflows.
 
 Security violations raise:
 
@@ -216,6 +222,7 @@ aisecops_interceptor/
 
 examples/
 
+  agent_demo.py
   demo.py
   langgraph_style_demo.py
   openclaw_demo.py
@@ -284,7 +291,7 @@ F --> I[Tool / API Execution]
 I --> J[Audit Event]
 ```
 
-This architecture ensures both **prompt‑layer attacks** and **dangerous tool executions** are controlled.
+This diagram shows the **tool-execution governance path** after prompt and output checks have already completed.
 
 ---
 
@@ -305,6 +312,7 @@ pytest -q
 uvicorn aisecops_interceptor.api.main:app --reload
 
 # run demos
+python -m examples.agent_demo
 python examples/demo.py
 python -m examples.langgraph_style_demo
 python examples/openclaw_demo.py
@@ -319,12 +327,15 @@ Current tests validate:
 - prompt injection detection
 - secret detection in model output
 - guarded LLM pipeline behavior
-- provider factory
+- provider factory behavior
+- interceptor decisions and approval flow
+- runtime context and execution gate behavior
+- adapter and API route coverage
 
 Example test output:
 
 ```
-19 passed
+All tests passing
 ```
 
 ---
@@ -394,13 +405,14 @@ The objective is a portable runtime capable of securing:
 
 Current state:
 
-Working runtime core + guarded LLM pipeline + interceptor enforcement.
+Working runtime core + guarded LLM pipeline + interceptor enforcement + end-to-end demo coverage.
 
-Next steps will focus on:
+Current engineering focus:
 
-- richer policy engine
-- persistent audit storage
-- advanced prompt attack detection
-- native integrations for real agent frameworks
+- unify duplicated runtime contracts
+- pass runtime context consistently across LLM and tool paths
+- strengthen policy evaluation with sensitivity metadata
+- enrich structured audit/event models
+- keep adapters thin while improving real framework integrations
 
 ---

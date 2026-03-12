@@ -5,9 +5,13 @@ from typing import Any
 
 from aisecops_interceptor.core.approval import ApprovalStore
 from aisecops_interceptor.core.audit import AuditLogger
+from aisecops_interceptor.core.context import RuntimeContext
+from aisecops_interceptor.core.events import AuditEvent
 from aisecops_interceptor.core.exceptions import ApprovalRequiredError, PolicyViolationError, ToolNotFoundError
-from aisecops_interceptor.core.models import AuditEvent, InterceptionRequest, RuntimeContext, ToolCall
+from aisecops_interceptor.core.models import InterceptionRequest, ToolCall
 from aisecops_interceptor.core.policy import PolicyEngine
+from aisecops_interceptor.core.decision import DecisionResult, DecisionType
+from aisecops_interceptor.core.execution import ExecutionGate
 
 
 class AgentInterceptor:
@@ -21,6 +25,7 @@ class AgentInterceptor:
         self.policy_engine = policy_engine
         self.audit_logger = audit_logger
         self.approval_store = approval_store or ApprovalStore()
+        self.execution_gate = ExecutionGate()
 
     def intercept(self, request: InterceptionRequest) -> Any:
         context = request.context
@@ -79,7 +84,20 @@ class AgentInterceptor:
         if tool is None:
             raise ToolNotFoundError(f"Tool '{context.tool_name}' not found")
 
-        return tool(**context.arguments)
+        decision_result = DecisionResult(
+            decision=(
+                DecisionType.ALLOW
+                if (decision.allowed or approved)
+                else DecisionType.BLOCK
+            ),
+            reason=decision.reason,
+        )
+
+        return self.execution_gate.execute(
+            decision_result,
+            tool,
+            **context.arguments,
+        )
 
     def evaluate(self, *, agent_name: str, tool_call: ToolCall):
         return self.policy_engine.evaluate(agent_name=agent_name, tool_call=tool_call)

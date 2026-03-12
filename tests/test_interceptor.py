@@ -1,8 +1,9 @@
 from aisecops_interceptor.core.approval import ApprovalStore
 from aisecops_interceptor.core.audit import AuditLogger
+from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.exceptions import ApprovalRequiredError, PolicyViolationError
 from aisecops_interceptor.core.interceptor import AgentInterceptor
-from aisecops_interceptor.core.models import InterceptionRequest, RuntimeContext, ToolCall
+from aisecops_interceptor.core.models import InterceptionRequest, ToolCall
 from aisecops_interceptor.core.policy import PolicyEngine
 
 

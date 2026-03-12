@@ -4,8 +4,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Callable
 
+from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.interceptor import AgentInterceptor
-from aisecops_interceptor.core.models import InterceptionRequest, RuntimeContext
+from aisecops_interceptor.core.models import InterceptionRequest
 
 
 class BaseRuntimeAdapter(ABC):
