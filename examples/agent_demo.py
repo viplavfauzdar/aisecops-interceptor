@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 from aisecops_interceptor.core.context import RuntimeContext
+from aisecops_interceptor.core.events import RuntimeEvent
 from aisecops_interceptor.core.exceptions import ApprovalRequiredError
 from aisecops_interceptor.core.interceptor import AgentInterceptor
 from aisecops_interceptor.core.models import InterceptionRequest
@@ -77,7 +78,7 @@ async def main() -> None:
         approval_store=approval_store,
     )
 
-    pipeline = GuardedLLMPipeline(client=FakeLLMClient())
+    pipeline = GuardedLLMPipeline(client=FakeLLMClient(), event_sink=audit_logger.log)
 
     print("1) Guarded LLM call")
     llm_context = RuntimeContext(
@@ -137,9 +138,20 @@ async def main() -> None:
         )
         print(result)
 
-    print("\n4) Audit events")
+    print("\n4) Runtime events")
     for event in audit_logger.events:
-        print(event)
+        if isinstance(event, RuntimeEvent):
+            print(
+                {
+                    "event_type": event.event_type,
+                    "decision": event.decision,
+                    "tool_name": event.tool_name,
+                    "reason": event.reason,
+                    "stage": event.stage,
+                }
+            )
+        else:
+            print(event)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional
 
-from aisecops_interceptor.core.events import LLMSecurityEvent
+from aisecops_interceptor.core.events import RuntimeEvent
 
 
 @dataclass(slots=True)
@@ -26,4 +26,4 @@ class LLMResponse:
     provider: Optional[str] = None
 
 
-LLMEventSink = Callable[[LLMSecurityEvent], None]
+LLMEventSink = Callable[[RuntimeEvent], None]

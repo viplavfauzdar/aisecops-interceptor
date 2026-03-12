@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 from aisecops_interceptor.core.context import RuntimeContext
-from aisecops_interceptor.core.events import LLMSecurityEvent
+from aisecops_interceptor.core.events import RuntimeEvent
 from aisecops_interceptor.guard.input_inspector import inspect_prompt
 from aisecops_interceptor.guard.output_inspector import inspect_output
 from aisecops_interceptor.llm.base import LLMClient
@@ -34,8 +32,7 @@ class GuardedLLMPipeline:
         if self.event_sink is None:
             return
         self.event_sink(
-            LLMSecurityEvent(
-                timestamp=datetime.now(timezone.utc),
+            RuntimeEvent.llm_event(
                 event_type=event_type,
                 decision=decision,
                 reason=reason,
@@ -60,6 +57,7 @@ class GuardedLLMPipeline:
         self._emit_event(
             event_type="prompt_allowed",
             decision="allowed",
+            reason="Prompt allowed",
             stage="input",
             context=context,
         )
@@ -80,6 +78,7 @@ class GuardedLLMPipeline:
         self._emit_event(
             event_type="output_allowed",
             decision="allowed",
+            reason="Output allowed",
             stage="output",
             context=context,
         )

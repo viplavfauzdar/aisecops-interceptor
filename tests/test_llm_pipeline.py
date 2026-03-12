@@ -2,6 +2,7 @@ import asyncio
 import pytest
 
 from aisecops_interceptor.core.context import RuntimeContext
+from aisecops_interceptor.core.events import RuntimeEvent
 from aisecops_interceptor.llm.models import LLMMessage, LLMRequest, LLMResponse
 from aisecops_interceptor.llm.pipeline import GuardedLLMPipeline, LLMGuardViolationError
 
@@ -33,6 +34,7 @@ def test_pipeline_allows_safe_input_and_output_with_runtime_context() -> None:
 
     assert response.content == "Safe response"
     assert [event.event_type for event in events] == ["prompt_allowed", "output_allowed"]
+    assert all(isinstance(event, RuntimeEvent) for event in events)
     assert all(event.context is context for event in events)
 
 
@@ -62,6 +64,7 @@ def test_pipeline_blocks_prompt_injection_with_runtime_context() -> None:
     assert exc.value.stage == "input"
     assert [event.event_type for event in events] == ["prompt_blocked"]
     assert events[0].decision == "blocked"
+    assert isinstance(events[0], RuntimeEvent)
     assert events[0].context is context
 
 
@@ -87,4 +90,5 @@ def test_pipeline_blocks_secret_like_output_with_runtime_context() -> None:
     assert exc.value.stage == "output"
     assert [event.event_type for event in events] == ["prompt_allowed", "output_blocked"]
     assert events[1].decision == "blocked"
+    assert isinstance(events[1], RuntimeEvent)
     assert events[1].context is context

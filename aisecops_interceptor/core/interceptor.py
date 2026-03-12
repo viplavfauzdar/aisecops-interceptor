@@ -6,7 +6,7 @@ from typing import Any
 from aisecops_interceptor.core.approval import ApprovalStore
 from aisecops_interceptor.core.audit import AuditLogger
 from aisecops_interceptor.core.context import RuntimeContext
-from aisecops_interceptor.core.events import AuditEvent
+from aisecops_interceptor.core.events import RuntimeEvent
 from aisecops_interceptor.core.exceptions import ApprovalRequiredError, PolicyViolationError, ToolNotFoundError
 from aisecops_interceptor.core.models import InterceptionRequest, ToolCall
 from aisecops_interceptor.core.policy import PolicyEngine
@@ -40,17 +40,12 @@ class AgentInterceptor:
                 risk_level=decision.risk_level,
             )
             self.audit_logger.log(
-                AuditEvent.create(
-                    agent_name=context.agent_name,
-                    tool_name=context.tool_name,
-                    framework=context.framework,
-                    actor=context.actor,
-                    environment=context.environment,
-                    session_id=context.session_id,
-                    correlation_id=context.correlation_id,
+                RuntimeEvent.tool_event(
+                    event_type="approval_required",
+                    decision="require_approval",
+                    context=context,
                     allowed=False,
                     reason=decision.reason,
-                    arguments=context.arguments,
                     risk_level=decision.risk_level,
                     matched_rule=decision.matched_rule,
                     approval_id=approval_request.approval_id,
@@ -60,17 +55,12 @@ class AgentInterceptor:
 
         approved = self.approval_store.is_approved(request.approval_id)
         self.audit_logger.log(
-            AuditEvent.create(
-                agent_name=context.agent_name,
-                tool_name=context.tool_name,
-                framework=context.framework,
-                actor=context.actor,
-                environment=context.environment,
-                session_id=context.session_id,
-                correlation_id=context.correlation_id,
+            RuntimeEvent.tool_event(
+                event_type="tool_allowed" if (decision.allowed or approved) else "tool_blocked",
+                decision="allowed" if (decision.allowed or approved) else "blocked",
+                context=context,
                 allowed=decision.allowed or approved,
                 reason=(f"{decision.reason} (approved)" if approved and decision.requires_approval else decision.reason),
-                arguments=context.arguments,
                 risk_level=decision.risk_level,
                 matched_rule=decision.matched_rule,
                 approval_id=request.approval_id,
@@ -93,11 +83,24 @@ class AgentInterceptor:
             reason=decision.reason,
         )
 
-        return self.execution_gate.execute(
+        result = self.execution_gate.execute(
             decision_result,
             tool,
             **context.arguments,
         )
+        self.audit_logger.log(
+            RuntimeEvent.tool_event(
+                event_type="tool_executed",
+                decision="allowed",
+                context=context,
+                allowed=True,
+                reason="Tool executed",
+                risk_level=decision.risk_level,
+                matched_rule=decision.matched_rule,
+                approval_id=request.approval_id,
+            )
+        )
+        return result
 
     def evaluate(
         self,

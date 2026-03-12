@@ -1,6 +1,7 @@
 from aisecops_interceptor.core.approval import ApprovalStore
 from aisecops_interceptor.core.audit import AuditLogger
 from aisecops_interceptor.core.context import RuntimeContext
+from aisecops_interceptor.core.events import RuntimeEvent
 from aisecops_interceptor.core.exceptions import ApprovalRequiredError, PolicyViolationError
 from aisecops_interceptor.core.interceptor import AgentInterceptor
 from aisecops_interceptor.core.models import InterceptionRequest, ToolCall
@@ -116,6 +117,10 @@ def test_intercept_supports_runtime_context_contract() -> None:
     )
     result = interceptor.intercept(request)
     assert result == {"customer_id": "456"}
+    events = list(interceptor.audit_logger.events())
+    assert len(events) == 2
+    assert all(isinstance(event, RuntimeEvent) for event in events)
+    assert [event.event_type for event in events] == ["tool_allowed", "tool_executed"]
 
 
 def test_intercept_blocks_high_sensitivity_context_end_to_end() -> None:
@@ -138,3 +143,40 @@ def test_intercept_blocks_high_sensitivity_context_end_to_end() -> None:
         assert False, "Expected PolicyViolationError"
     except PolicyViolationError as exc:
         assert "Sensitivity level 'high' is blocked by policy" in str(exc)
+    events = list(interceptor.audit_logger.events())
+    assert len(events) == 1
+    assert isinstance(events[0], RuntimeEvent)
+    assert events[0].event_type == "tool_blocked"
+
+
+def test_intercept_emits_approval_required_and_tool_executed_events() -> None:
+    interceptor = make_interceptor()
+
+    try:
+        interceptor.execute(
+            agent_name="ops_agent",
+            tool_call=ToolCall(name="restart_service", arguments={"service": "orders"}),
+            tool_registry={"restart_service": lambda service: {"service": service, "status": "restarted"}},
+        )
+        assert False, "Expected ApprovalRequiredError"
+    except ApprovalRequiredError as exc:
+        approval_id = exc.approval_id
+
+    events = list(interceptor.audit_logger.events())
+    assert [event.event_type for event in events] == ["approval_required"]
+    assert all(isinstance(event, RuntimeEvent) for event in events)
+
+    interceptor.approval_store.approve(approval_id, reviewed_by="reviewer")
+    result = interceptor.execute(
+        agent_name="ops_agent",
+        tool_call=ToolCall(name="restart_service", arguments={"service": "orders"}),
+        tool_registry={"restart_service": lambda service: {"service": service, "status": "restarted"}},
+        approval_id=approval_id,
+    )
+
+    assert result == {"service": "orders", "status": "restarted"}
+    assert [event.event_type for event in interceptor.audit_logger.events()] == [
+        "approval_required",
+        "tool_allowed",
+        "tool_executed",
+    ]

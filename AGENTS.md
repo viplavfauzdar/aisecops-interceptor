@@ -13,8 +13,7 @@ These instructions apply to the repository rooted at `/Users/viplavfauzdar/Proje
 - `aisecops_interceptor/core/context.py` is the single canonical home of `RuntimeContext`.
 - Do not introduce another `RuntimeContext` definition anywhere else.
 - `aisecops_interceptor/core/models.py` contains shared runtime dataclasses such as `ToolCall`, `InterceptionRequest`, `PolicyDecision`, and `ApprovalRequest`.
-- `aisecops_interceptor/core/events.py` is the canonical home of `AuditEvent` and other runtime event models.
-- Do not refactor `AuditEvent` naming or event-model boundaries unless the task explicitly asks for it.
+- `aisecops_interceptor/core/events.py` is the canonical home of the unified runtime event model used by both LLM-stage and tool-stage events.
 - Preserve the current approval flow shape: policy decides, interceptor handles approval orchestration, execution gate stays minimal.
 
 ### Runtime flow contract
@@ -30,7 +29,7 @@ Prompt
 → Approval workflow (if required)
 → ExecutionGate
 → Tool execution
-→ AuditEvent logging
+→ unified runtime event logging
 
 No new logic should bypass the interceptor or execution gate.
 
