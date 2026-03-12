@@ -6,7 +6,7 @@ from typing import Any
 from aisecops_interceptor.core.approval import ApprovalStore
 from aisecops_interceptor.core.audit import AuditLogger
 from aisecops_interceptor.core.exceptions import ApprovalRequiredError, PolicyViolationError, ToolNotFoundError
-from aisecops_interceptor.core.models import AuditEvent, ToolCall
+from aisecops_interceptor.core.models import AuditEvent, InterceptionRequest, RuntimeContext, ToolCall
 from aisecops_interceptor.core.policy import PolicyEngine
 
 
@@ -22,6 +22,65 @@ class AgentInterceptor:
         self.audit_logger = audit_logger
         self.approval_store = approval_store or ApprovalStore()
 
+    def intercept(self, request: InterceptionRequest) -> Any:
+        context = request.context
+        tool_call = context.to_tool_call()
+        decision = self.evaluate(agent_name=context.agent_name, tool_call=tool_call)
+
+        if decision.requires_approval and not self.approval_store.is_approved(request.approval_id):
+            approval_request = self.approval_store.create_request(
+                agent_name=context.agent_name,
+                tool_call=tool_call,
+                reason=decision.reason,
+                risk_level=decision.risk_level,
+            )
+            self.audit_logger.log(
+                AuditEvent.create(
+                    agent_name=context.agent_name,
+                    tool_name=context.tool_name,
+                    framework=context.framework,
+                    actor=context.actor,
+                    environment=context.environment,
+                    session_id=context.session_id,
+                    correlation_id=context.correlation_id,
+                    allowed=False,
+                    reason=decision.reason,
+                    arguments=context.arguments,
+                    risk_level=decision.risk_level,
+                    matched_rule=decision.matched_rule,
+                    approval_id=approval_request.approval_id,
+                )
+            )
+            raise ApprovalRequiredError(decision.reason, approval_id=approval_request.approval_id)
+
+        approved = self.approval_store.is_approved(request.approval_id)
+        self.audit_logger.log(
+            AuditEvent.create(
+                agent_name=context.agent_name,
+                tool_name=context.tool_name,
+                framework=context.framework,
+                actor=context.actor,
+                environment=context.environment,
+                session_id=context.session_id,
+                correlation_id=context.correlation_id,
+                allowed=decision.allowed or approved,
+                reason=(f"{decision.reason} (approved)" if approved and decision.requires_approval else decision.reason),
+                arguments=context.arguments,
+                risk_level=decision.risk_level,
+                matched_rule=decision.matched_rule,
+                approval_id=request.approval_id,
+            )
+        )
+
+        if not decision.allowed and not (decision.requires_approval and approved):
+            raise PolicyViolationError(decision.reason)
+
+        tool = request.tool_registry.get(context.tool_name)
+        if tool is None:
+            raise ToolNotFoundError(f"Tool '{context.tool_name}' not found")
+
+        return tool(**context.arguments)
+
     def evaluate(self, *, agent_name: str, tool_call: ToolCall):
         return self.policy_engine.evaluate(agent_name=agent_name, tool_call=tool_call)
 
@@ -33,47 +92,16 @@ class AgentInterceptor:
         tool_registry: dict[str, Callable[..., Any]],
         approval_id: str | None = None,
     ) -> Any:
-        decision = self.evaluate(agent_name=agent_name, tool_call=tool_call)
-
-        if decision.requires_approval and not self.approval_store.is_approved(approval_id):
-            request = self.approval_store.create_request(
-                agent_name=agent_name,
-                tool_call=tool_call,
-                reason=decision.reason,
-                risk_level=decision.risk_level,
-            )
-            self.audit_logger.log(
-                AuditEvent.create(
-                    agent_name=agent_name,
-                    tool_name=tool_call.name,
-                    allowed=False,
-                    reason=decision.reason,
-                    arguments=tool_call.arguments,
-                    risk_level=decision.risk_level,
-                    matched_rule=decision.matched_rule,
-                    approval_id=request.approval_id,
-                )
-            )
-            raise ApprovalRequiredError(decision.reason, approval_id=request.approval_id)
-
-        self.audit_logger.log(
-            AuditEvent.create(
-                agent_name=agent_name,
-                tool_name=tool_call.name,
-                allowed=decision.allowed or self.approval_store.is_approved(approval_id),
-                reason=(decision.reason if not approval_id else f"{decision.reason} (approved)") if decision.requires_approval else decision.reason,
-                arguments=tool_call.arguments,
-                risk_level=decision.risk_level,
-                matched_rule=decision.matched_rule,
+        context = RuntimeContext(
+            agent_name=agent_name,
+            tool_name=tool_call.name,
+            arguments=tool_call.arguments,
+            framework="legacy",
+        )
+        return self.intercept(
+            InterceptionRequest(
+                context=context,
+                tool_registry=tool_registry,
                 approval_id=approval_id,
             )
         )
-
-        if not decision.allowed and not (decision.requires_approval and self.approval_store.is_approved(approval_id)):
-            raise PolicyViolationError(decision.reason)
-
-        tool = tool_registry.get(tool_call.name)
-        if tool is None:
-            raise ToolNotFoundError(f"Tool '{tool_call.name}' not found")
-
-        return tool(**tool_call.arguments)

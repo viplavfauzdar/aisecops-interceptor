@@ -2,195 +2,365 @@
 
 Runtime security and policy enforcement for AI agents.
 
-AISecOps Interceptor is a framework-agnostic runtime enforcement layer that sits between an AI agent runtime and the tools, APIs, and actions it wants to execute.
+AISecOps Interceptor is a **framework‑agnostic runtime security layer** that sits between an AI agent runtime and the tools, APIs, or actions it wants to execute.
 
-The current codebase is beyond the original proof-of-concept stage and should now be treated as the beginning of the real product core: a portable interceptor with thin framework adapters.
+The project has evolved from an early proof‑of‑concept into the **core of a portable AI security runtime** designed to work with multiple agent frameworks such as OpenClaw, LangGraph, CrewAI, or custom agent systems.
 
-## Included now
+---
 
-- Core interception before tool execution
-- Policy-based allow / block / approval decisions
+# What the interceptor provides
+
+AISecOps Interceptor enforces security and policy at **two critical layers of AI systems**:
+
+1. **Prompt layer protection** (before an LLM is called)
+2. **Tool execution protection** (before a tool or API is executed)
+
+This ensures:
+
+- prompt injection protection
+- secret exfiltration protection
+- policy‑based tool execution
+- human approval for sensitive actions
+- full audit trail
+
+---
+
+# Included capabilities
+
+Current implementation includes:
+
+### Core runtime
+
+- Interceptor core
+- Policy evaluation
+- Risk classification
+- Human approval workflow
 - Structured audit logging
-- Risk levels (`low`, `medium`, `high`)
-- Human approval workflow for sensitive actions
-- FastAPI wrapper for local API testing
-- LangGraph-style adapter
-- OpenClaw-style adapter
-- Demos and tests
 
-## Architecture
+### LLM security layer
 
-The product architecture is now centered on a framework-agnostic interception core.
+- Provider‑agnostic LLM abstraction
+- Guarded LLM pipeline
+- Prompt inspection
+- Output inspection
 
-Adapters should remain thin and translate framework-specific tool calls into a common AISecOps execution contract.
+### Supported model providers
 
-The core flow is:
+- OpenAI
+- Ollama (local models)
+- Anthropic (Claude)
+
+### Integrations
+
+- LangGraph‑style adapter
+- OpenClaw‑style adapter
+- Generic adapter example
+
+### Developer tooling
+
+- FastAPI runtime wrapper
+- Demo scripts
+- Full pytest test suite
+
+---
+
+# High‑level architecture
 
 ```mermaid
 flowchart TD
-    A[Agent Runtime / Framework] --> B[Adapter]
-    B --> C[AISecOps Interceptor]
-    C --> C1[Context Builder]
-    C --> C2[Policy Evaluator]
-    C --> C3[Risk Classifier]
-    C --> C4[Approval Manager]
-    C --> C5[Audit Emitter]
-    C --> D[Execution Gate]
-    D --> E[Tool Callable]
+
+A[Agent Runtime / Framework]
+
+A --> B[Framework Adapter]
+
+B --> C[AISecOps Interceptor]
+
+C --> D[Policy Evaluation]
+C --> E[Risk Classification]
+C --> F[Approval Manager]
+C --> G[Audit Logging]
+
+C --> H[Execution Gate]
+
+H --> I[Tool / API Execution]
 ```
 
-Design rule:
+Adapters are intentionally **thin**.
 
-- framework integrations do not contain security policy logic
-- policy, risk, approval, and audit stay in the interceptor core
-- the API layer is only a wrapper for testing and local development
+All security logic lives inside the interceptor core.
 
-## Quick start
+---
 
-```bash
-# Create environment
-python3.13 -m venv .venv
-source .venv/bin/activate
+# LLM security architecture
 
-# Install dependencies
-pip install -r requirements.txt
+The interceptor now includes a **guarded LLM pipeline**.
 
-# Run tests
-pytest -q
+This protects both prompt input and model output before tools are executed.
 
-# Start interceptor API
-uvicorn aisecops_interceptor.api.main:app --reload
+```mermaid
+flowchart TD
 
-# Run base demo
-python examples/demo.py
+A[Agent Prompt]
 
-# Run LangGraph-style interceptor demo (recommended first)
-python -m examples.langgraph_style_demo
+A --> B[Prompt Guard]
 
-# Run OpenClaw-style tool execution demo
-python examples/openclaw_demo.py
+B --> C[Guarded LLM Pipeline]
+
+C --> D[LLM Provider]
+
+D --> E[Model Response]
+
+E --> F[Output Guard]
+
+F --> G[AISecOps Interceptor]
+
+G --> H[Tool Execution]
 ```
 
-Use Python 3.11 through 3.13 for this project. Python 3.14 currently fails while building `pydantic-core`, which is required by the pinned `pydantic` dependency.
+---
 
-## Key files
+# Guarded LLM pipeline
+
+The pipeline ensures every LLM request follows this path:
+
+```mermaid
+flowchart LR
+
+A[LLMRequest]
+
+A --> B[Input Inspector]
+
+B --> C[LLM Client]
+
+C --> D[Output Inspector]
+
+D --> E[LLMResponse]
+```
+
+Security violations raise:
+
+```
+LLMGuardViolationError
+```
+
+Which prevents unsafe model responses from reaching the agent runtime.
+
+---
+
+# Supported LLM providers
+
+All providers implement the same interface:
+
+```
+LLMClient
+   └── chat(LLMRequest) → LLMResponse
+```
+
+Providers included:
+
+```
+ollama_client.py
+openai_client.py
+anthropic_client.py
+```
+
+The factory creates providers dynamically:
+
+```
+create_llm_client(LLMConfig)
+```
+
+---
+
+# Repository structure
 
 ```text
 aisecops_interceptor/
+
   api/
     main.py
-  config/
-    policies.yaml
+
   core/
+    interceptor.py
+    policy.py
     approval.py
     audit.py
-    exceptions.py
-    interceptor.py
+
+  guard/
+    detectors.py
+    input_inspector.py
+    output_inspector.py
     models.py
-    policy.py
+
+  llm/
+    base.py
+    config.py
+    factory.py
+    models.py
+    pipeline.py
+
+    providers/
+      ollama_client.py
+      openai_client.py
+      anthropic_client.py
+
   integrations/
     langgraph_adapter.py
     openclaw_adapter.py
     simple_adapter.py
+
 examples/
+
   demo.py
   langgraph_style_demo.py
   openclaw_demo.py
+
 tests/
 ```
 
-## Example approval flow
+---
 
-1. Agent requests `restart_service`
-2. Policy marks it `approval_required`
-3. Interceptor creates `approval_id`
-4. Human approves
-5. Same call is replayed with `approval_id`
-6. Tool executes
-
-## Validated runtime behaviors
-
-The current demos validate the three core AISecOps control paths:
-
-| Scenario | Result |
-|--------|--------|
-| Safe tool call | Executes immediately |
-| Restricted tool call | Blocked by policy |
-| Sensitive tool call | Requires human approval |
-
-Example LangGraph demo output:
-
-```
-1) Safe tool call
-{'service': 'payments', 'status': 'green'}
-
-2) Approval-required tool call
-{'approval_required': True, 'approval_id': 'apr-xxxx', 'message': "Tool 'restart_service' requires human approval"}
-
-3) Re-run after approval
-{'service': 'payments', 'status': 'restarted'}
-```
-
-This confirms the runtime control model:
+# Example runtime flow
 
 ```mermaid
 flowchart TD
-    A[Agent / Graph] --> B[AISecOps Interceptor]
-    B --> C[Policy Decision]
-    C --> D[Allow / Block / Approval]
-    D --> E[Tool Execution]
+
+A[User Prompt]
+
+A --> B[Prompt Guard]
+
+B --> C[LLM Pipeline]
+
+C --> D[Output Guard]
+
+D --> E[AISecOps Interceptor]
+
+E --> F[Policy Decision]
+
+F --> G[Allow / Block / Approval]
+
+G --> H[Tool Execution]
+
+H --> I[Audit Event]
 ```
 
-This validates the current product shape:
+This architecture ensures both **prompt‑layer attacks** and **dangerous tool executions** are controlled.
 
-```mermaid
-flowchart LR
-    A[Adapter] --> B[Interceptor Core]
-    B --> C[Policy Decision]
-    C --> D[Allow / Block / Approval]
-    D --> E[Tool Execution + Audit]
+---
+
+# Quick start
+
+```bash
+# create environment
+python3.13 -m venv .venv
+source .venv/bin/activate
+
+# install dependencies
+pip install -r requirements.txt
+
+# run tests
+pytest -q
+
+# run API
+uvicorn aisecops_interceptor.api.main:app --reload
+
+# run demos
+python examples/demo.py
+python -m examples.langgraph_style_demo
+python examples/openclaw_demo.py
 ```
 
-## FastAPI endpoints
+---
 
-- `POST /execute`
-- `GET /audit`
-- `GET /approvals`
-- `POST /approvals/{approval_id}/approve`
-- `POST /approvals/{approval_id}/reject`
-- `POST /openclaw/execute`
+# Test coverage
 
-## Strategic next code changes
+Current tests validate:
 
-The next phase is to turn the current working starter into a cleaner product core.
+- prompt injection detection
+- secret detection in model output
+- guarded LLM pipeline behavior
+- provider factory
 
-Immediate priorities:
+Example test output:
 
-- define a stable interceptor execution contract for all adapters
-- formalize runtime context passed into the interceptor
-- separate decision phase from execution phase
-- keep adapters thin and free of policy logic
-- enrich audit events into a real security telemetry model
-- make approval state first-class and extensible
+```
+19 passed
+```
 
-Near-term follow-up:
+---
 
-- add a formal adapter base interface
-- add persistent approval and audit storage
-- add policy provider abstraction beyond YAML
-- add native runtime integrations for real LangGraph and OpenClaw execution paths
+# Example approval workflow
 
-## Product direction
+1. Agent calls sensitive tool
+2. Policy requires approval
+3. Interceptor creates approval ID
+4. Human approves request
+5. Tool execution proceeds
 
-AISecOps Interceptor is the product core.
+---
 
-OpenClaw, LangGraph, CrewAI, and other agent frameworks should be treated as integration surfaces, not as the center of the architecture.
+# Long‑term vision
 
-The long-term goal is a portable runtime control layer for AI agents:
+AISecOps Interceptor is intended to become a **universal security runtime for AI agents**.
+
+Goal architecture:
 
 ```mermaid
 flowchart TD
-    A[Any Agent Framework] --> B[AISecOps Interceptor]
-    B --> C[Policy / Risk / Approval / Audit]
-    C --> D[Real Tool or Action Execution]
+
+A[Any Agent Framework]
+
+A --> B[AISecOps Interceptor]
+
+B --> C[Security Layer]
+
+C --> D[Policy]
+C --> E[Risk]
+C --> F[Approval]
+C --> G[Audit]
+
+C --> H[LLM Guard]
+
+B --> I[Tool Execution]
 ```
+
+Frameworks like:
+
+- OpenClaw
+- LangGraph
+- CrewAI
+- AutoGen
+
+should all plug into the same interceptor runtime.
+
+---
+
+# Project direction
+
+AISecOps Interceptor is the **core product**.
+
+Agent frameworks are **integration surfaces**, not the center of the architecture.
+
+The objective is a portable runtime capable of securing:
+
+- AI copilots
+- autonomous agents
+- enterprise AI systems
+- AI developer platforms
+
+---
+
+# Status
+
+Current state:
+
+Working runtime core + guarded LLM pipeline + interceptor enforcement.
+
+Next steps will focus on:
+
+- richer policy engine
+- persistent audit storage
+- advanced prompt attack detection
+- native integrations for real agent frameworks
+
+---

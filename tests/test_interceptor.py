@@ -2,7 +2,7 @@ from aisecops_interceptor.core.approval import ApprovalStore
 from aisecops_interceptor.core.audit import AuditLogger
 from aisecops_interceptor.core.exceptions import ApprovalRequiredError, PolicyViolationError
 from aisecops_interceptor.core.interceptor import AgentInterceptor
-from aisecops_interceptor.core.models import ToolCall
+from aisecops_interceptor.core.models import InterceptionRequest, RuntimeContext, ToolCall
 from aisecops_interceptor.core.policy import PolicyEngine
 
 
@@ -81,3 +81,21 @@ def test_requires_approval_then_allows_after_approval() -> None:
         approval_id=approval_id,
     )
     assert result == {"service": "orders", "status": "restarted"}
+
+
+def test_intercept_supports_runtime_context_contract() -> None:
+    interceptor = make_interceptor()
+    request = InterceptionRequest(
+        context=RuntimeContext(
+            agent_name="sales_agent",
+            tool_name="read_customer",
+            arguments={"customer_id": "456"},
+            framework="langgraph",
+            actor="user-123",
+            environment="prod",
+            correlation_id="corr-1",
+        ),
+        tool_registry={"read_customer": lambda customer_id: {"customer_id": customer_id}},
+    )
+    result = interceptor.intercept(request)
+    assert result == {"customer_id": "456"}

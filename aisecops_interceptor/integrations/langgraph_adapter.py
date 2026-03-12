@@ -4,15 +4,20 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 from aisecops_interceptor.core.interceptor import AgentInterceptor
-from aisecops_interceptor.core.models import ToolCall
+from aisecops_interceptor.integrations.simple_adapter import BaseRuntimeAdapter
 
 
-class LangGraphToolAdapter:
+class LangGraphToolAdapter(BaseRuntimeAdapter):
     """Lightweight adapter for LangGraph/LangChain-style tool execution."""
 
-    def __init__(self, *, interceptor: AgentInterceptor, agent_name: str) -> None:
-        self.interceptor = interceptor
+    def __init__(self, *, interceptor: AgentInterceptor, agent_name: str, environment: str = "dev") -> None:
+        super().__init__(
+            interceptor=interceptor,
+            framework_name="langgraph",
+            default_agent_name=agent_name,
+        )
         self.agent_name = agent_name
+        self.environment = environment
 
     def invoke_tool(
         self,
@@ -23,10 +28,30 @@ class LangGraphToolAdapter:
         approval_id: str | None = None,
     ) -> Any:
         registry = self._normalize_registry(tool_registry)
-        return self.interceptor.execute(
+        context = self.build_context(
+            tool_name=tool_name,
+            arguments=arguments or {},
             agent_name=self.agent_name,
-            tool_call=ToolCall(name=tool_name, arguments=arguments or {}),
+            environment=self.environment,
+        )
+        return self.intercept_call(
+            context=context,
             tool_registry=registry,
+            approval_id=approval_id,
+        )
+
+    def run(
+        self,
+        tool_name: str,
+        *,
+        arguments: dict[str, Any] | None,
+        tool_registry: Mapping[str, Any],
+        approval_id: str | None = None,
+    ) -> Any:
+        return self.invoke_tool(
+            tool_name=tool_name,
+            arguments=arguments,
+            tool_registry=tool_registry,
             approval_id=approval_id,
         )
 
@@ -34,9 +59,14 @@ class LangGraphToolAdapter:
         registry = {tool_name: self._coerce_tool(tool)}
 
         def _wrapped(arguments: dict[str, Any] | None = None, *, approval_id: str | None = None) -> Any:
-            return self.interceptor.execute(
+            context = self.build_context(
+                tool_name=tool_name,
+                arguments=arguments or {},
                 agent_name=self.agent_name,
-                tool_call=ToolCall(name=tool_name, arguments=arguments or {}),
+                environment=self.environment,
+            )
+            return self.intercept_call(
+                context=context,
                 tool_registry=registry,
                 approval_id=approval_id,
             )
