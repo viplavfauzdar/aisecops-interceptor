@@ -152,6 +152,7 @@ The `/audit` endpoint supports optional query parameters: `event_type`, `stage`,
 Supported sink types include file-backed JSONL persistence, in-memory collection, and webhook delivery to external HTTP endpoints.
 Sink delivery is isolated per sink, so one failing sink does not block the others.
 Sink failures are recorded in-memory by `AuditLogger` for local inspection without interrupting delivery to healthy sinks.
+The API exposes recorded sink delivery issues through `/audit/failures`.
 
 Security violations raise:
 
@@ -419,7 +420,7 @@ Current tests validate:
 Example test output:
 
 ```
-All tests passing
+47 passed
 ```
 
 ---

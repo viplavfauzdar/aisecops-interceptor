@@ -155,3 +155,8 @@ def get_audit(
             limit=limit,
         )
     ]
+
+
+@app.get("/audit/failures")
+def get_audit_failures() -> list[dict]:
+    return [asdict(item) for item in audit.sink_failures()]

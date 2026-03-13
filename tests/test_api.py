@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
-from aisecops_interceptor.api.main import app
+from aisecops_interceptor.api.main import app, audit
+from aisecops_interceptor.core.audit import SinkFailure
 
 
 client = TestClient(app)
@@ -121,3 +122,28 @@ def test_audit_endpoint_applies_limit() -> None:
     audit_response = client.get("/audit", params={"limit": 1})
     assert audit_response.status_code == 200
     assert len(audit_response.json()) == 1
+
+
+def test_audit_failures_endpoint_returns_recorded_sink_failures() -> None:
+    original_failures = list(audit.sink_failures())
+    audit._sink_failures.append(
+        SinkFailure(
+            sink_type="WebhookEventSink",
+            event_type="tool_executed",
+            error_type="HTTPError",
+            message="boom",
+        )
+    )
+
+    try:
+        response = client.get("/audit/failures")
+        assert response.status_code == 200
+        failures = response.json()
+        assert any(
+            item["sink_type"] == "WebhookEventSink"
+            and item["event_type"] == "tool_executed"
+            and item["error_type"] == "HTTPError"
+            for item in failures
+        )
+    finally:
+        audit._sink_failures[:] = original_failures
