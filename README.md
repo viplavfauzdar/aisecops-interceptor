@@ -1,15 +1,30 @@
 # AISecOps Interceptor
 
-Runtime security and policy enforcement for AI agents.
+Runtime security and governance layer for AI agents.
 
-AISecOps Interceptor is a **framework‑agnostic runtime security layer** that sits between an AI agent runtime and the tools, APIs, or actions it wants to execute.
-
-The project has evolved from an early proof‑of‑concept into the **core of a portable AI security runtime** designed to work with multiple agent frameworks such as OpenClaw, LangGraph, CrewAI, or custom agent systems.
+AISecOps Interceptor is to AI agents what application security middleware is to web apps: a **framework‑agnostic runtime security layer** that sits between an agent runtime and the tools, APIs, or actions it wants to execute.
 
 Release metadata:
 
 - License: [MIT](LICENSE)
 - Release notes: [CHANGELOG.md](CHANGELOG.md)
+
+## Why this exists
+
+AI agents can call tools, execute code, access data, and trigger real-world actions.
+
+Most agent frameworks still leave runtime governance to application code.
+That means developers often have to bolt on security checks, approval workflows, prompt filtering, and audit logging themselves.
+
+AISecOps Interceptor provides that missing runtime layer.
+
+It helps teams:
+
+- detect prompt injection attempts before tool use
+- inspect large language model (LLM) outputs for secret leakage
+- enforce policy decisions before execution
+- require approval for sensitive actions
+- persist runtime events for audit and observability
 
 ---
 
@@ -27,6 +42,14 @@ This ensures:
 - policy‑based tool execution
 - human approval for sensitive actions
 - full audit trail
+
+## Common use cases
+
+- **Agent tool governance** — prevent agents from executing dangerous tools or APIs without policy checks.
+- **Prompt injection resistance** — detect malicious instruction patterns before they influence downstream actions.
+- **Approval workflows** — require a human decision before sensitive operations run.
+- **Agent audit trails** — persist and query runtime events for incident review and compliance.
+- **Security event delivery** — fan out runtime events to file, memory, or webhook sinks.
 
 ---
 
@@ -75,6 +98,8 @@ Current implementation includes:
 
 # High‑level architecture
 
+At a high level, AISecOps Interceptor sits in the missing control plane layer between agent frameworks and real execution.
+
 ```mermaid
 flowchart TD
 
@@ -94,6 +119,13 @@ F --> G[Tool / API Execution]
 
 G --> H[Audit Event]
 ```
+
+This is the core execution path developers integrate with:
+
+- agent framework builds runtime context
+- interceptor evaluates policy and rules
+- execution gate decides allow, block, or approval
+- runtime events are emitted to audit sinks
 
 Adapters are intentionally **thin**.
 
@@ -386,6 +418,8 @@ Policy decisions in this flow may come from declarative rules or from the fallba
 
 # Quick start
 
+Minimal install and demo:
+
 ```bash
 # create environment
 python3.13 -m venv .venv
@@ -409,6 +443,29 @@ python examples/demo.py
 python -m examples.langgraph_style_demo
 python examples/openclaw_demo.py
 python -m examples.policy_bundle_demo
+```
+
+## Minimal example
+
+```python
+from aisecops_interceptor.core.context import RuntimeContext
+from aisecops_interceptor.core.interceptor import AgentInterceptor
+from aisecops_interceptor.core.models import InterceptionRequest
+
+# In practice, use the provided policy engine / adapters from the repo.
+context = RuntimeContext(
+    agent_name="ops_agent",
+    tool_name="restart_service",
+    sensitivity_level="high",
+)
+
+# interceptor.intercept(...) will evaluate policy before the tool executes.
+```
+
+For a complete end-to-end example, run:
+
+```bash
+python -m examples.agent_demo
 ```
 
 `pyproject.toml` is the source of truth for runtime package metadata and dependencies. `requirements.txt` is scoped for local development and test tooling on top of the editable install.
@@ -502,7 +559,7 @@ The objective is a portable runtime capable of securing:
 
 Current state:
 
-Working runtime core + guarded LLM pipeline + interceptor enforcement + declarative rule engine + end-to-end demo coverage.
+Working runtime core + guarded large language model pipeline + interceptor enforcement + declarative rule engine + end-to-end demo coverage.
 
 Current engineering focus:
 
@@ -512,3 +569,17 @@ Current engineering focus:
 - keep adapters thin while improving real framework integrations
 
 ---
+
+# Positioning
+
+AISecOps Interceptor is best understood as a **runtime governance layer for AI agents**.
+
+It combines:
+
+- prompt and output inspection
+- policy-driven execution control
+- approval workflows
+- unified runtime events
+- audit and sink delivery
+
+for agentic systems that need security, observability, and controlled execution.
