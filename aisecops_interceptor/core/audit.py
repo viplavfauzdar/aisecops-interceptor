@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from aisecops_interceptor.core.event_sink import FileEventSink, InMemoryEventSink
+from aisecops_interceptor.core.event_sink import EventSink, FileEventSink, InMemoryEventSink
 from aisecops_interceptor.core.events import RuntimeEvent
 
 
@@ -10,11 +10,11 @@ class AuditLogger:
     def __init__(
         self,
         log_path: str | None = None,
-        sinks: list[InMemoryEventSink | FileEventSink] | None = None,
+        sinks: list[EventSink] | None = None,
     ) -> None:
         self.in_memory_sink = InMemoryEventSink()
         self.file_sink = FileEventSink(log_path) if log_path else None
-        self.sinks = [self.in_memory_sink]
+        self.sinks: list[EventSink] = [self.in_memory_sink]
         if self.file_sink is not None:
             self.sinks.append(self.file_sink)
         if sinks:

@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import Iterable, Protocol
 
+import httpx
+
 from aisecops_interceptor.core.events import RuntimeEvent
 
 
@@ -66,3 +68,17 @@ class FileEventSink:
         if limit is not None:
             return tuple(filtered[:limit])
         return tuple(filtered)
+
+
+class WebhookEventSink:
+    def __init__(self, url: str, timeout: float = 5.0) -> None:
+        self.url = url
+        self.timeout = timeout
+
+    def emit(self, event: RuntimeEvent) -> None:
+        response = httpx.post(
+            self.url,
+            json=event.to_dict(),
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
