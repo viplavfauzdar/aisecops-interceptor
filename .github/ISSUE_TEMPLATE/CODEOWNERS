@@ -1,0 +1,9 @@
+# Use @viplavfauzdar for everything by default
+* @viplavfauzdar
+
+# Security-specific files require extra attention
+/SECURITY.md                @viplavfauzdar
+/aisecops_interceptor/core/  @viplavfauzdar
+
+# Policy and rule changes
+/aisecops_interceptor/policy/ @viplavfauzdar
