@@ -76,3 +76,21 @@ class AuditLogger:
 
     def sink_failures(self) -> Iterable[SinkFailure]:
         return tuple(self._sink_failures)
+
+    def query_sink_failures(
+        self,
+        *,
+        sink_type: str | None = None,
+        event_type: str | None = None,
+        error_type: str | None = None,
+        limit: int | None = None,
+    ) -> Iterable[SinkFailure]:
+        failures = [
+            failure for failure in self._sink_failures
+            if (sink_type is None or failure.sink_type == sink_type)
+            and (event_type is None or failure.event_type == event_type)
+            and (error_type is None or failure.error_type == error_type)
+        ]
+        if limit is not None:
+            return tuple(failures[:limit])
+        return tuple(failures)

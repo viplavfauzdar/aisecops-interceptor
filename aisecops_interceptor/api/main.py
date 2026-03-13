@@ -158,5 +158,18 @@ def get_audit(
 
 
 @app.get("/audit/failures")
-def get_audit_failures() -> list[dict]:
-    return [asdict(item) for item in audit.sink_failures()]
+def get_audit_failures(
+    sink_type: str | None = None,
+    event_type: str | None = None,
+    error_type: str | None = None,
+    limit: int | None = None,
+) -> list[dict]:
+    return [
+        asdict(item)
+        for item in audit.query_sink_failures(
+            sink_type=sink_type,
+            event_type=event_type,
+            error_type=error_type,
+            limit=limit,
+        )
+    ]

@@ -7,6 +7,10 @@ from aisecops_interceptor.core.audit import SinkFailure
 client = TestClient(app)
 
 
+def _set_sink_failures(failures: list[SinkFailure]) -> None:
+    audit._sink_failures[:] = failures
+
+
 def test_execute_endpoint_allows_and_serializes_audit_event() -> None:
     response = client.post(
         "/execute",
@@ -126,13 +130,15 @@ def test_audit_endpoint_applies_limit() -> None:
 
 def test_audit_failures_endpoint_returns_recorded_sink_failures() -> None:
     original_failures = list(audit.sink_failures())
-    audit._sink_failures.append(
-        SinkFailure(
-            sink_type="WebhookEventSink",
-            event_type="tool_executed",
-            error_type="HTTPError",
-            message="boom",
-        )
+    _set_sink_failures(
+        [
+            SinkFailure(
+                sink_type="WebhookEventSink",
+                event_type="tool_executed",
+                error_type="HTTPError",
+                message="boom",
+            )
+        ]
     )
 
     try:
@@ -146,4 +152,74 @@ def test_audit_failures_endpoint_returns_recorded_sink_failures() -> None:
             for item in failures
         )
     finally:
-        audit._sink_failures[:] = original_failures
+        _set_sink_failures(original_failures)
+
+
+def test_audit_failures_endpoint_filters_by_sink_type() -> None:
+    original_failures = list(audit.sink_failures())
+    _set_sink_failures(
+        [
+            SinkFailure("WebhookEventSink", "tool_executed", "HTTPError", "boom"),
+            SinkFailure("FileEventSink", "tool_allowed", "OSError", "disk full"),
+        ]
+    )
+    try:
+        response = client.get("/audit/failures", params={"sink_type": "WebhookEventSink"})
+        assert response.status_code == 200
+        failures = response.json()
+        assert failures
+        assert all(item["sink_type"] == "WebhookEventSink" for item in failures)
+    finally:
+        _set_sink_failures(original_failures)
+
+
+def test_audit_failures_endpoint_filters_by_event_type() -> None:
+    original_failures = list(audit.sink_failures())
+    _set_sink_failures(
+        [
+            SinkFailure("WebhookEventSink", "tool_executed", "HTTPError", "boom"),
+            SinkFailure("WebhookEventSink", "tool_allowed", "HTTPError", "timeout"),
+        ]
+    )
+    try:
+        response = client.get("/audit/failures", params={"event_type": "tool_allowed"})
+        assert response.status_code == 200
+        failures = response.json()
+        assert failures
+        assert all(item["event_type"] == "tool_allowed" for item in failures)
+    finally:
+        _set_sink_failures(original_failures)
+
+
+def test_audit_failures_endpoint_filters_by_error_type() -> None:
+    original_failures = list(audit.sink_failures())
+    _set_sink_failures(
+        [
+            SinkFailure("WebhookEventSink", "tool_executed", "HTTPError", "boom"),
+            SinkFailure("FileEventSink", "tool_allowed", "OSError", "disk full"),
+        ]
+    )
+    try:
+        response = client.get("/audit/failures", params={"error_type": "OSError"})
+        assert response.status_code == 200
+        failures = response.json()
+        assert failures
+        assert all(item["error_type"] == "OSError" for item in failures)
+    finally:
+        _set_sink_failures(original_failures)
+
+
+def test_audit_failures_endpoint_applies_limit() -> None:
+    original_failures = list(audit.sink_failures())
+    _set_sink_failures(
+        [
+            SinkFailure("WebhookEventSink", "tool_executed", "HTTPError", "boom"),
+            SinkFailure("FileEventSink", "tool_allowed", "OSError", "disk full"),
+        ]
+    )
+    try:
+        response = client.get("/audit/failures", params={"limit": 1})
+        assert response.status_code == 200
+        assert len(response.json()) == 1
+    finally:
+        _set_sink_failures(original_failures)
