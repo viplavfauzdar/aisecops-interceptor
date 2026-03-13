@@ -386,11 +386,14 @@ Policy decisions in this flow may come from declarative rules or from the fallba
 python3.13 -m venv .venv
 source .venv/bin/activate
 
-# install dependencies
-pip install -r requirements.txt
+# install package
+python -m pip install -e .
+
+# install local test tooling
+python -m pip install -r requirements.txt
 
 # run tests
-pytest -q
+python -m pytest -q
 
 # run API
 uvicorn aisecops_interceptor.api.main:app --reload
@@ -402,6 +405,8 @@ python -m examples.langgraph_style_demo
 python examples/openclaw_demo.py
 python -m examples.policy_bundle_demo
 ```
+
+`pyproject.toml` is the source of truth for runtime package metadata and dependencies. `requirements.txt` is scoped for local development and test tooling on top of the editable install.
 
 ---
 
