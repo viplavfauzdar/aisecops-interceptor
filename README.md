@@ -151,7 +151,7 @@ Current implementation includes:
 ### Developer tooling
 
 - FastAPI runtime wrapper
-- Demo scripts (`agent_demo`, `demo.py`, `langgraph_style_demo`, `openclaw_demo`, `policy_bundle_demo`)
+- Demo scripts (`agent_demo`, `capabilities_demo`, `demo.py`, `langgraph_style_demo`, `openclaw_demo`, `policy_bundle_demo`)
 - Full pytest test suite
 
 ---
@@ -309,16 +309,21 @@ Each rule supports:
 
 If rules are provided, the first matching rule wins and overrides the default policy behavior. If no rule matches, the existing blocked-tool, dangerous-argument, allowlist, approval, and monitored-tool logic still applies. The current test suite covers allow, block, require-approval, and sensitivity-based rule evaluation.
 
-Example capability mapping:
+Capability mappings can be defined declaratively in YAML, for example in `policies/capabilities.yaml`:
 
-```python
-capability_mapping = {
-    "cap_service_ops": ["restart_service"],
-    "cap_customer_read": ["read_customer"],
-}
+```yaml
+capabilities:
+  cap_service_ops:
+    tools:
+      - restart_service
+      - stop_service
+
+  cap_customer_read:
+    tools:
+      - read_customer
 ```
 
-If an agent receives `allowed_capabilities=["cap_service_ops"]`, it can request `restart_service`. If the capability list is omitted, current behavior remains unchanged and the interceptor falls back to the existing policy flow.
+If an agent receives `allowed_capabilities=["cap_service_ops"]`, it can request `restart_service`. If the capability list is omitted, current behavior remains unchanged and the interceptor falls back to the existing policy flow. Direct Python mappings still work, but YAML-backed loading is the preferred path.
 
 Example:
 
@@ -416,15 +421,20 @@ aisecops_interceptor/
     openclaw_adapter.py
     simple_adapter.py
 
+policies/
+  capabilities.yaml
+
 examples/
 
   agent_demo.py
+  capabilities_demo.py
   demo.py
   langgraph_style_demo.py
   openclaw_demo.py
   policy_bundle_demo.py
 
 tests/
+  test_capability_registry.py
   test_policy_engine.py
   test_policy_loader.py
 ```
@@ -519,6 +529,7 @@ uvicorn aisecops_interceptor.api.main:app --reload
 
 # run demos
 python -m examples.agent_demo
+python -m examples.capabilities_demo
 python examples/demo.py
 python -m examples.langgraph_style_demo
 python examples/openclaw_demo.py
@@ -570,7 +581,7 @@ Current tests validate:
 Latest verified local run:
 
 ```
-All tests passing
+65 passed
 ```
 
 ---

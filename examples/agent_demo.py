@@ -75,12 +75,7 @@ async def main() -> None:
         policy_engine=policy_engine,
         audit_logger=audit_logger,
         approval_store=approval_store,
-        capability_registry=CapabilityRegistry(
-            {
-                "cap_service_ops": ["restart_service"],
-                "cap_customer_read": ["read_customer"],
-            }
-        ),
+        capability_registry=CapabilityRegistry.from_yaml("policies/capabilities.yaml"),
     )
 
     pipeline = GuardedLLMPipeline(client=FakeLLMClient(), event_sink=audit_logger.log)
