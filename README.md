@@ -6,6 +6,11 @@ AISecOps Interceptor is a **framework‑agnostic runtime security layer** that s
 
 The project has evolved from an early proof‑of‑concept into the **core of a portable AI security runtime** designed to work with multiple agent frameworks such as OpenClaw, LangGraph, CrewAI, or custom agent systems.
 
+Release metadata:
+
+- License: [MIT](LICENSE)
+- Release notes: [CHANGELOG.md](CHANGELOG.md)
+
 ---
 
 # What the interceptor provides
