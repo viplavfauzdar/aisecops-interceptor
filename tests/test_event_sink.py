@@ -2,7 +2,7 @@ from unittest.mock import Mock, patch
 
 import httpx
 
-from aisecops_interceptor.core.audit import AuditLogger
+from aisecops_interceptor.core.audit import AuditLogger, SinkFailure
 from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.event_sink import FileEventSink, InMemoryEventSink, WebhookEventSink
 from aisecops_interceptor.core.events import RuntimeEvent
@@ -99,7 +99,10 @@ def test_webhook_sink_coexists_with_file_and_memory_sinks(tmp_path) -> None:
 def test_failing_webhook_sink_does_not_stop_file_sink(tmp_path) -> None:
     file_sink = FileEventSink(str(tmp_path / "runtime-events.jsonl"))
     webhook_sink = WebhookEventSink("https://example.com/webhook")
-    logger = AuditLogger(sinks=[file_sink, webhook_sink])
+    logger = AuditLogger(
+        sinks=[file_sink, webhook_sink],
+        sink_failure_log_path=str(tmp_path / "sink-failures.jsonl"),
+    )
     context = RuntimeContext(agent_name="demo-agent", tool_name="read_customer")
     event = RuntimeEvent.tool_event(
         event_type="tool_executed",
@@ -122,12 +125,19 @@ def test_failing_webhook_sink_does_not_stop_file_sink(tmp_path) -> None:
     assert failures[0].sink_type == "WebhookEventSink"
     assert failures[0].event_type == "tool_executed"
     assert failures[0].error_type == "HTTPError"
+    persisted_failures = list(logger.persisted_sink_failures())
+    assert len(persisted_failures) == 1
+    assert persisted_failures[0].sink_type == "WebhookEventSink"
+    assert persisted_failures[0].event_type == "tool_executed"
 
 
-def test_failing_webhook_sink_does_not_stop_memory_sink() -> None:
+def test_failing_webhook_sink_does_not_stop_memory_sink(tmp_path) -> None:
     extra_memory_sink = InMemoryEventSink()
     webhook_sink = WebhookEventSink("https://example.com/webhook")
-    logger = AuditLogger(sinks=[extra_memory_sink, webhook_sink])
+    logger = AuditLogger(
+        sinks=[extra_memory_sink, webhook_sink],
+        sink_failure_log_path=str(tmp_path / "sink-failures.jsonl"),
+    )
     context = RuntimeContext(agent_name="demo-agent", tool_name="read_customer")
     event = RuntimeEvent.tool_event(
         event_type="tool_allowed",
@@ -150,3 +160,22 @@ def test_failing_webhook_sink_does_not_stop_memory_sink() -> None:
     assert failures[0].sink_type == "WebhookEventSink"
     assert failures[0].event_type == "tool_allowed"
     assert failures[0].error_type == "HTTPError"
+    persisted_failures = list(logger.persisted_sink_failures())
+    assert len(persisted_failures) == 1
+    assert persisted_failures[0].sink_type == "WebhookEventSink"
+    assert persisted_failures[0].event_type == "tool_allowed"
+
+
+def test_sink_failure_is_persisted_to_jsonl(tmp_path) -> None:
+    logger = AuditLogger(sink_failure_log_path=str(tmp_path / "sink-failures.jsonl"))
+    failure = SinkFailure(
+        sink_type="WebhookEventSink",
+        event_type="tool_blocked",
+        error_type="HTTPError",
+        message="boom",
+    )
+    logger.record_sink_failure(failure)
+
+    persisted_failures = list(logger.persisted_sink_failures())
+    assert len(persisted_failures) == 1
+    assert persisted_failures[0] == failure

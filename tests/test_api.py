@@ -1,3 +1,5 @@
+import json
+
 from fastapi.testclient import TestClient
 
 from aisecops_interceptor.api.main import app, audit
@@ -9,6 +11,31 @@ client = TestClient(app)
 
 def _set_sink_failures(failures: list[SinkFailure]) -> None:
     audit._sink_failures[:] = failures
+    if audit.sink_failure_log_path is None:
+        return
+    audit.sink_failure_log_path.parent.mkdir(parents=True, exist_ok=True)
+    with audit.sink_failure_log_path.open("w", encoding="utf-8") as f:
+        for failure in failures:
+            f.write(json.dumps(failure.to_dict()) + "\n")
+
+
+def _capture_sink_failure_state() -> tuple[list[SinkFailure], str | None]:
+    persisted = None
+    if audit.sink_failure_log_path is not None and audit.sink_failure_log_path.exists():
+        persisted = audit.sink_failure_log_path.read_text(encoding="utf-8")
+    return list(audit.sink_failures()), persisted
+
+
+def _restore_sink_failure_state(failures: list[SinkFailure], persisted: str | None) -> None:
+    audit._sink_failures[:] = failures
+    if audit.sink_failure_log_path is None:
+        return
+    audit.sink_failure_log_path.parent.mkdir(parents=True, exist_ok=True)
+    if persisted is None:
+        if audit.sink_failure_log_path.exists():
+            audit.sink_failure_log_path.unlink()
+        return
+    audit.sink_failure_log_path.write_text(persisted, encoding="utf-8")
 
 
 def test_execute_endpoint_allows_and_serializes_audit_event() -> None:
@@ -129,7 +156,7 @@ def test_audit_endpoint_applies_limit() -> None:
 
 
 def test_audit_failures_endpoint_returns_recorded_sink_failures() -> None:
-    original_failures = list(audit.sink_failures())
+    original_failures, original_persisted = _capture_sink_failure_state()
     _set_sink_failures(
         [
             SinkFailure(
@@ -152,11 +179,11 @@ def test_audit_failures_endpoint_returns_recorded_sink_failures() -> None:
             for item in failures
         )
     finally:
-        _set_sink_failures(original_failures)
+        _restore_sink_failure_state(original_failures, original_persisted)
 
 
 def test_audit_failures_endpoint_filters_by_sink_type() -> None:
-    original_failures = list(audit.sink_failures())
+    original_failures, original_persisted = _capture_sink_failure_state()
     _set_sink_failures(
         [
             SinkFailure("WebhookEventSink", "tool_executed", "HTTPError", "boom"),
@@ -170,11 +197,11 @@ def test_audit_failures_endpoint_filters_by_sink_type() -> None:
         assert failures
         assert all(item["sink_type"] == "WebhookEventSink" for item in failures)
     finally:
-        _set_sink_failures(original_failures)
+        _restore_sink_failure_state(original_failures, original_persisted)
 
 
 def test_audit_failures_endpoint_filters_by_event_type() -> None:
-    original_failures = list(audit.sink_failures())
+    original_failures, original_persisted = _capture_sink_failure_state()
     _set_sink_failures(
         [
             SinkFailure("WebhookEventSink", "tool_executed", "HTTPError", "boom"),
@@ -188,11 +215,11 @@ def test_audit_failures_endpoint_filters_by_event_type() -> None:
         assert failures
         assert all(item["event_type"] == "tool_allowed" for item in failures)
     finally:
-        _set_sink_failures(original_failures)
+        _restore_sink_failure_state(original_failures, original_persisted)
 
 
 def test_audit_failures_endpoint_filters_by_error_type() -> None:
-    original_failures = list(audit.sink_failures())
+    original_failures, original_persisted = _capture_sink_failure_state()
     _set_sink_failures(
         [
             SinkFailure("WebhookEventSink", "tool_executed", "HTTPError", "boom"),
@@ -206,11 +233,11 @@ def test_audit_failures_endpoint_filters_by_error_type() -> None:
         assert failures
         assert all(item["error_type"] == "OSError" for item in failures)
     finally:
-        _set_sink_failures(original_failures)
+        _restore_sink_failure_state(original_failures, original_persisted)
 
 
 def test_audit_failures_endpoint_applies_limit() -> None:
-    original_failures = list(audit.sink_failures())
+    original_failures, original_persisted = _capture_sink_failure_state()
     _set_sink_failures(
         [
             SinkFailure("WebhookEventSink", "tool_executed", "HTTPError", "boom"),
@@ -222,4 +249,4 @@ def test_audit_failures_endpoint_applies_limit() -> None:
         assert response.status_code == 200
         assert len(response.json()) == 1
     finally:
-        _set_sink_failures(original_failures)
+        _restore_sink_failure_state(original_failures, original_persisted)
