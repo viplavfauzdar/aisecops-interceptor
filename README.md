@@ -1,9 +1,8 @@
 # 🛡️ AISecOps Interceptor
 ### Runtime security and governance layer for AI agents.
-**The missing runtime security layer for AI Agents.**
 **A framework-agnostic runtime control plane for agent security, policy enforcement, and auditability.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![CI](https://github.com/viplavfauzdar/aisecops-interceptor/actions/workflows/ci.yml/badge.svg)](https://github.com/viplavfauzdar/aisecops-interceptor/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/viplavfauzdar/aisecops-interceptor/actions/workflows/security.yml/badge.svg)](https://github.com/viplavfauzdar/aisecops-interceptor/actions/workflows/security.yml)
@@ -15,13 +14,13 @@ AISecOps Interceptor provides a framework-agnostic control plane to detect promp
 All pull requests and pushes to `main` are validated by GitHub Actions.
 The pipeline runs compile checks, tests, and demo smoke tests in CI, plus Bandit, pip-audit, Gitleaks, and CodeQL in the security workflow.
 
-## ⚡ Quick Start
+## ⚡ Getting Started
 
 ### 1. Installation
 ```bash
 git clone https://github.com/viplavfauzdar/aisecops-interceptor.git
 cd aisecops-interceptor
-pip install -e .
+pip install -e .[dev]
 ```
 
 ### 2. Basic Interceptor Usage
@@ -63,11 +62,11 @@ In practical terms, the interceptor sits between your **agent framework** and th
 
 Release metadata:
 
-- License: [MIT](LICENSE)
+- License: [Apache License 2.0](LICENSE)
 - Release notes: [CHANGELOG.md](CHANGELOG.md)
 
-This project is licensed under the **MIT License**.
-See [LICENSE](LICENSE) for the full license text.
+This project is licensed under the **Apache License 2.0**.
+See the [LICENSE](LICENSE) and `NOTICE` files for full legal details and attribution information.
 
 ## Why this exists
 
@@ -193,8 +192,11 @@ This is the core execution path developers integrate with:
 
 Adapters are intentionally **thin**.
 
+
 All security logic lives inside the interceptor core.
 > This makes AISecOps Interceptor useful as a standalone security layer even when the surrounding agent framework changes.
+
+The **capability gate** acts as the interceptor’s first authorization boundary. It ensures an agent can only request tools it has explicitly been granted access to. Even if a tool is discovered through prompt injection, probing, or model hallucination, the request is blocked before policy evaluation unless the agent has the required capability.
 
 ---
 
@@ -447,15 +449,17 @@ C --> D[Output Guard]
 
 D --> E[Runtime Context Builder]
 
-E --> F[AISecOps Interceptor]
+E --> F[Capability Gate]
 
-F --> G[Decision Engine]
+F --> G[AISecOps Interceptor]
 
-G --> H[Execution Gate]
+G --> H[Decision Engine]
 
-H --> I[Tool / API Execution]
+H --> I[Execution Gate]
 
-I --> J[Audit Event]
+I --> J[Tool / API Execution]
+
+J --> K[Audit Event]
 ```
 
 This makes it clear that **both prompt-layer threats and tool-execution risks are governed by the AISecOps runtime**.
@@ -469,23 +473,25 @@ A[Agent Tool Request]
 
 A --> B[Runtime Context Builder]
 
-B --> C[AISecOps Interceptor]
+B --> C[Capability Gate]
 
-C --> D[Decision Engine]
+C --> D[AISecOps Interceptor]
 
-D --> E{Decision}
+D --> E[Decision Engine]
 
-E -->|Allow| F[Execution Gate]
+E --> F{Decision}
 
-E -->|Block| G[Reject Request]
+F -->|Allow| G[Execution Gate]
 
-E -->|Require Approval| H[Approval Workflow]
+F -->|Block| H[Reject Request]
 
-H --> F
+F -->|Require Approval| I[Approval Workflow]
 
-F --> I[Tool / API Execution]
+I --> G
 
-I --> J[Audit Event]
+G --> J[Tool / API Execution]
+
+J --> K[Audit Event]
 ```
 
 This diagram shows the **tool-execution governance path** after prompt and output checks have already completed.
@@ -493,7 +499,7 @@ Policy decisions in this flow may come from declarative rules or from the fallba
 
 ---
 
-# Quick start
+# Full local quick start
 
 Minimal local setup and demo:
 
@@ -502,11 +508,8 @@ Minimal local setup and demo:
 python3.13 -m venv .venv
 source .venv/bin/activate
 
-# install package
-python -m pip install -e .
-
-# install local test tooling
-python -m pip install -r requirements.txt
+# install package + local dev tooling
+python -m pip install -e .[dev]
 
 # run tests
 python -m pytest -q
@@ -546,7 +549,7 @@ For a complete end-to-end example, run:
 python -m examples.agent_demo
 ```
 
-`pyproject.toml` is the source of truth for runtime package metadata and dependencies. `requirements.txt` is scoped for local development and test tooling on top of the editable install.
+`pyproject.toml` is the source of truth for runtime and development dependencies. `requirements.txt` is a thin wrapper around the editable install with the `dev` extra.
 
 ---
 
@@ -564,10 +567,10 @@ Current tests validate:
 - runtime context and execution gate behavior
 - adapter and API route coverage
 
-Example test output:
+Latest verified local run:
 
 ```
-61 passed
+All tests passing
 ```
 
 ---

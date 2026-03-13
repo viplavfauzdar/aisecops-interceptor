@@ -17,6 +17,11 @@ dependencies = [
   "uvicorn==0.35.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+  "pytest==8.4.1",
+]
+
 [tool.setuptools.packages.find]
 include = ["aisecops_interceptor*"]
 
