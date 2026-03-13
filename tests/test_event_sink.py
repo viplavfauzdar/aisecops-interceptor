@@ -71,6 +71,62 @@ def test_webhook_event_sink_posts_runtime_event_json() -> None:
     response.raise_for_status.assert_called_once_with()
 
 
+def test_webhook_event_sink_succeeds_after_retry() -> None:
+    sink = WebhookEventSink("https://example.com/webhook", retry_count=2, backoff_delay=0.2)
+    context = RuntimeContext(agent_name="demo-agent", tool_name="read_customer")
+    event = RuntimeEvent.tool_event(
+        event_type="tool_allowed",
+        decision="allowed",
+        context=context,
+        allowed=True,
+        reason="Allowed by policy",
+    )
+    response = Mock(spec=httpx.Response)
+    response.raise_for_status = Mock()
+
+    with (
+        patch(
+            "aisecops_interceptor.core.event_sink.httpx.post",
+            side_effect=[httpx.HTTPError("temporary"), response],
+        ) as mock_post,
+        patch("aisecops_interceptor.core.event_sink.time.sleep") as mock_sleep,
+    ):
+        sink.emit(event)
+
+    assert mock_post.call_count == 2
+    mock_sleep.assert_called_once_with(0.2)
+    response.raise_for_status.assert_called_once_with()
+
+
+def test_webhook_event_sink_raises_after_exhausting_retries() -> None:
+    sink = WebhookEventSink("https://example.com/webhook", retry_count=2, backoff_delay=0.2)
+    context = RuntimeContext(agent_name="demo-agent", tool_name="read_customer")
+    event = RuntimeEvent.tool_event(
+        event_type="tool_allowed",
+        decision="allowed",
+        context=context,
+        allowed=True,
+        reason="Allowed by policy",
+    )
+
+    with (
+        patch(
+            "aisecops_interceptor.core.event_sink.httpx.post",
+            side_effect=httpx.HTTPError("boom"),
+        ) as mock_post,
+        patch("aisecops_interceptor.core.event_sink.time.sleep") as mock_sleep,
+    ):
+        try:
+            sink.emit(event)
+        except httpx.HTTPError as exc:
+            assert str(exc) == "boom"
+        else:
+            raise AssertionError("Expected webhook delivery to raise after exhausting retries")
+
+    assert mock_post.call_count == 3
+    assert mock_sleep.call_count == 2
+
+
 def test_webhook_sink_coexists_with_file_and_memory_sinks(tmp_path) -> None:
     file_sink = FileEventSink(str(tmp_path / "runtime-events.jsonl"))
     extra_memory_sink = InMemoryEventSink()

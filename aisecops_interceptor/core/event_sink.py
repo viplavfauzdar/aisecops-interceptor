@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 from typing import Iterable, Protocol
 
@@ -71,14 +72,34 @@ class FileEventSink:
 
 
 class WebhookEventSink:
-    def __init__(self, url: str, timeout: float = 5.0) -> None:
+    def __init__(
+        self,
+        url: str,
+        timeout: float = 5.0,
+        retry_count: int = 2,
+        backoff_delay: float = 0.05,
+    ) -> None:
         self.url = url
         self.timeout = timeout
+        self.retry_count = retry_count
+        self.backoff_delay = backoff_delay
 
     def emit(self, event: RuntimeEvent) -> None:
-        response = httpx.post(
-            self.url,
-            json=event.to_dict(),
-            timeout=self.timeout,
-        )
-        response.raise_for_status()
+        last_error: httpx.HTTPError | None = None
+        for attempt in range(self.retry_count + 1):
+            try:
+                response = httpx.post(
+                    self.url,
+                    json=event.to_dict(),
+                    timeout=self.timeout,
+                )
+                response.raise_for_status()
+                return
+            except httpx.HTTPError as exc:
+                last_error = exc
+                if attempt == self.retry_count:
+                    raise
+                time.sleep(self.backoff_delay)
+
+        if last_error is not None:
+            raise last_error
