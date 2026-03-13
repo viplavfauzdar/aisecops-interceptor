@@ -117,6 +117,11 @@ def test_failing_webhook_sink_does_not_stop_file_sink(tmp_path) -> None:
 
     assert [item.event_type for item in logger.events()] == ["tool_executed"]
     assert [item.event_type for item in file_sink.events()] == ["tool_executed"]
+    failures = list(logger.sink_failures())
+    assert len(failures) == 1
+    assert failures[0].sink_type == "WebhookEventSink"
+    assert failures[0].event_type == "tool_executed"
+    assert failures[0].error_type == "HTTPError"
 
 
 def test_failing_webhook_sink_does_not_stop_memory_sink() -> None:
@@ -140,3 +145,8 @@ def test_failing_webhook_sink_does_not_stop_memory_sink() -> None:
 
     assert [item.event_type for item in logger.events()] == ["tool_allowed"]
     assert [item.event_type for item in extra_memory_sink.events()] == ["tool_allowed"]
+    failures = list(logger.sink_failures())
+    assert len(failures) == 1
+    assert failures[0].sink_type == "WebhookEventSink"
+    assert failures[0].event_type == "tool_allowed"
+    assert failures[0].error_type == "HTTPError"

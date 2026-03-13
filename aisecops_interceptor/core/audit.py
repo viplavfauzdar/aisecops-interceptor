@@ -1,9 +1,18 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Iterable
 
 from aisecops_interceptor.core.event_sink import EventSink, FileEventSink, InMemoryEventSink
 from aisecops_interceptor.core.events import RuntimeEvent
+
+
+@dataclass(slots=True)
+class SinkFailure:
+    sink_type: str
+    event_type: str
+    error_type: str
+    message: str
 
 
 class AuditLogger:
@@ -15,6 +24,7 @@ class AuditLogger:
         self.in_memory_sink = InMemoryEventSink()
         self.file_sink = FileEventSink(log_path) if log_path else None
         self.sinks: list[EventSink] = [self.in_memory_sink]
+        self._sink_failures: list[SinkFailure] = []
         if self.file_sink is not None:
             self.sinks.append(self.file_sink)
         if sinks:
@@ -24,7 +34,15 @@ class AuditLogger:
         for sink in self.sinks:
             try:
                 sink.emit(event)
-            except Exception:
+            except Exception as exc:
+                self._sink_failures.append(
+                    SinkFailure(
+                        sink_type=type(sink).__name__,
+                        event_type=event.event_type,
+                        error_type=type(exc).__name__,
+                        message=str(exc),
+                    )
+                )
                 continue
 
     def events(self) -> Iterable[RuntimeEvent]:
@@ -55,3 +73,6 @@ class AuditLogger:
             correlation_id=correlation_id,
             limit=limit,
         )
+
+    def sink_failures(self) -> Iterable[SinkFailure]:
+        return tuple(self._sink_failures)

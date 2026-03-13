@@ -151,6 +151,7 @@ The `/audit` endpoint supports optional query parameters: `event_type`, `stage`,
 `AuditLogger` can also emit the same `RuntimeEvent` records to multiple sinks, such as JSONL persistence and additional in-memory or external streaming adapters.
 Supported sink types include file-backed JSONL persistence, in-memory collection, and webhook delivery to external HTTP endpoints.
 Sink delivery is isolated per sink, so one failing sink does not block the others.
+Sink failures are recorded in-memory by `AuditLogger` for local inspection without interrupting delivery to healthy sinks.
 
 Security violations raise:
 
