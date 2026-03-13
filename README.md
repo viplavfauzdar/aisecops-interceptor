@@ -15,6 +15,22 @@ cd aisecops-interceptor
 pip install -e .
 ```
 
+### 2. Basic Interceptor Usage
+```bash
+from aisecops_interceptor.core.context import RuntimeContext
+from aisecops_interceptor.core.interceptor import AgentInterceptor
+
+# Define your security context
+context = RuntimeContext(
+    agent_name="ops_agent",
+    tool_name="restart_service",
+    sensitivity_level="high"
+)
+
+# The interceptor evaluates your YAML policies and rules
+# before allowing the tool to execute.
+```
+
 ## Runtime security and governance layer for AI agents.
 
 AISecOps Interceptor is to AI agents what application security middleware is to web apps: a **framework‑agnostic runtime security layer** that sits between an agent runtime and the tools, APIs, or actions it wants to execute.
@@ -433,7 +449,7 @@ Policy decisions in this flow may come from declarative rules or from the fallba
 
 # Quick start
 
-Minimal install and demo:
+Minimal install and demo after cloning:
 
 ```bash
 # create environment
