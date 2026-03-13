@@ -1,6 +1,7 @@
 # 🛡️ AISecOps Interceptor
 ### Runtime security and governance layer for AI agents.
 **The missing runtime security layer for AI Agents.**
+**A framework-agnostic runtime control plane for agent security, policy enforcement, and auditability.**
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
@@ -20,21 +21,36 @@ pip install -e .
 ```python
 from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.interceptor import AgentInterceptor
+from aisecops_interceptor.core.models import InterceptionRequest
 
-# Define your security context
+# In practice, initialize the interceptor with the repo's policy engine,
+# audit logger, and approval store.
+interceptor = AgentInterceptor(...)
+
 context = RuntimeContext(
     agent_name="ops_agent",
     tool_name="restart_service",
-    sensitivity_level="high"
+    sensitivity_level="high",
 )
 
-# The interceptor evaluates your YAML policies and rules
-# before allowing the tool to execute.
+request = InterceptionRequest(
+    context=context,
+    tool_registry={
+        "restart_service": lambda service: {"service": service, "status": "restarted"}
+    },
+)
+
+# interceptor.intercept(...) evaluates policy and returns
+# allow / block / require_approval before the tool executes.
+result = interceptor.intercept(request)
 ```
 
 ## What AISecOps Interceptor Is
 
 AISecOps Interceptor is to AI agents what application security middleware is to web apps: a **framework‑agnostic runtime security layer** that sits between an agent runtime and the tools, APIs, or actions it wants to execute.
+
+It is designed for developers building agents that can call tools, trigger workflows, access sensitive data, or interact with real infrastructure. Instead of scattering security checks across application code, AISecOps Interceptor centralizes runtime governance in one place.
+
 
 In practical terms, the interceptor sits between your **agent framework** and the **tools or APIs** the agent attempts to call. Every execution request passes through policy evaluation, approval workflows, and audit logging before the action occurs.
 
@@ -128,7 +144,7 @@ Current implementation includes:
 ### Developer tooling
 
 - FastAPI runtime wrapper
-- Demo scripts (`agent_demo`, `demo.py`, `langgraph_style_demo`, `openclaw_demo`)
+- Demo scripts (`agent_demo`, `demo.py`, `langgraph_style_demo`, `openclaw_demo`, `policy_bundle_demo`)
 - Full pytest test suite
 
 ---
@@ -167,6 +183,7 @@ This is the core execution path developers integrate with:
 Adapters are intentionally **thin**.
 
 All security logic lives inside the interceptor core.
+> This makes AISecOps Interceptor useful as a standalone security layer even when the surrounding agent framework changes.
 
 ---
 
@@ -597,7 +614,7 @@ The objective is a portable runtime capable of securing:
 
 Current state:
 
-Working runtime core + guarded large language model pipeline + interceptor enforcement + declarative rule engine + end-to-end demo coverage.
+Working runtime core + guarded large language model pipeline + interceptor enforcement + declarative policy engine + end-to-end demo coverage.
 
 Current engineering focus:
 
