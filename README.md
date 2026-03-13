@@ -1,7 +1,8 @@
 # 🛡️ AISecOps Interceptor
+### Runtime security and governance layer for AI agents.
 **The missing runtime security layer for AI Agents.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 
 AISecOps Interceptor provides a framework-agnostic control plane to detect prompt injections, prevent secret leakage, and enforce human-in-the-loop approvals before your agents execute dangerous tools.
@@ -16,7 +17,7 @@ pip install -e .
 ```
 
 ### 2. Basic Interceptor Usage
-```bash
+```python
 from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.interceptor import AgentInterceptor
 
@@ -31,13 +32,15 @@ context = RuntimeContext(
 # before allowing the tool to execute.
 ```
 
-## Runtime security and governance layer for AI agents.
+## What AISecOps Interceptor Is
 
 AISecOps Interceptor is to AI agents what application security middleware is to web apps: a **framework‑agnostic runtime security layer** that sits between an agent runtime and the tools, APIs, or actions it wants to execute.
 
+In practical terms, the interceptor sits between your **agent framework** and the **tools or APIs** the agent attempts to call. Every execution request passes through policy evaluation, approval workflows, and audit logging before the action occurs.
+
 Release metadata:
 
-- License: [MIT](LICENSE)
+- License: [Apache License 2.0](LICENSE)
 - Release notes: [CHANGELOG.md](CHANGELOG.md)
 
 ## Why this exists
@@ -321,7 +324,7 @@ YAML bundles are validated before rules are constructed, and invalid bundles rai
 
 ---
 
-# Repository structure
+# Repository layout
 
 ```text
 aisecops_interceptor/
@@ -449,7 +452,7 @@ Policy decisions in this flow may come from declarative rules or from the fallba
 
 # Quick start
 
-Minimal install and demo after cloning:
+Minimal local setup and demo:
 
 ```bash
 # create environment
@@ -490,7 +493,8 @@ context = RuntimeContext(
     sensitivity_level="high",
 )
 
-# interceptor.intercept(...) will evaluate policy before the tool executes.
+# interceptor.intercept(...) evaluates policy and returns
+# allow / block / require_approval before the tool executes.
 ```
 
 For a complete end-to-end example, run:
@@ -535,7 +539,7 @@ Example test output:
 
 ---
 
-# Long‑term vision
+# Architecture direction
 
 AISecOps Interceptor is intended to become a **universal security runtime for AI agents**.
 
@@ -614,3 +618,20 @@ It combines:
 - audit and sink delivery
 
 for agentic systems that need security, observability, and controlled execution.
+
+---
+
+# Ecosystem positioning
+
+AISecOps Interceptor is designed to complement modern agent frameworks rather than replace them.
+
+Typical integration targets include:
+
+- LangGraph
+- CrewAI
+- AutoGen
+- OpenClaw
+
+These frameworks orchestrate agents, while AISecOps Interceptor governs **runtime security, execution control, and auditability**.
+
+The long‑term goal is a portable runtime security layer that can protect any agent framework with minimal adapter code.
