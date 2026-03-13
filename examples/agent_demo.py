@@ -9,8 +9,9 @@ from uuid import uuid4
 
 from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.audit import AuditLogger
+from aisecops_interceptor.core.capability_registry import CapabilityRegistry
 from aisecops_interceptor.core.events import RuntimeEvent
-from aisecops_interceptor.core.exceptions import ApprovalRequiredError
+from aisecops_interceptor.core.exceptions import ApprovalRequiredError, PolicyViolationError
 from aisecops_interceptor.core.interceptor import AgentInterceptor
 from aisecops_interceptor.core.models import InterceptionRequest
 from aisecops_interceptor.core.policy import PolicyEngine
@@ -74,6 +75,12 @@ async def main() -> None:
         policy_engine=policy_engine,
         audit_logger=audit_logger,
         approval_store=approval_store,
+        capability_registry=CapabilityRegistry(
+            {
+                "cap_service_ops": ["restart_service"],
+                "cap_customer_read": ["read_customer"],
+            }
+        ),
     )
 
     pipeline = GuardedLLMPipeline(client=FakeLLMClient(), event_sink=audit_logger.log)
@@ -106,6 +113,7 @@ async def main() -> None:
         actor="demo-user",
         environment="dev",
         correlation_id="demo-corr-1",
+        allowed_capabilities=["cap_service_ops"],
     )
 
     print("\n2) Interceptor tool request")
@@ -158,6 +166,23 @@ async def main() -> None:
     print("\n6) Filtered persisted runtime events")
     for event in audit_logger.query_persisted_events(stage="tool", tool_name="restart_service"):
         print({"event_type": event.event_type, "stage": event.stage, "tool_name": event.tool_name})
+
+    print("\n7) Capability gate example")
+    try:
+        interceptor.intercept(
+            InterceptionRequest(
+                context=RuntimeContext(
+                    agent_name="ops_agent",
+                    tool_name="restart_service",
+                    arguments={"service": "payments-api"},
+                    framework="demo",
+                    allowed_capabilities=["cap_customer_read"],
+                ),
+                tool_registry=tool_registry,
+            )
+        )
+    except PolicyViolationError as exc:
+        print({"capability_blocked": True, "reason": str(exc)})
 
 
 if __name__ == "__main__":

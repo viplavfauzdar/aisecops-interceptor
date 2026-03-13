@@ -3,7 +3,7 @@
 **The missing runtime security layer for AI Agents.**
 **A framework-agnostic runtime control plane for agent security, policy enforcement, and auditability.**
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 
 AISecOps Interceptor provides a framework-agnostic control plane to detect prompt injections, prevent secret leakage, and enforce human-in-the-loop approvals before your agents execute dangerous tools.
@@ -40,7 +40,7 @@ request = InterceptionRequest(
     },
 )
 
-# interceptor.intercept(...) evaluates policy and returns
+# interceptor.intercept(...) capability-gates the request, then evaluates
 # allow / block / require_approval before the tool executes.
 result = interceptor.intercept(request)
 ```
@@ -52,15 +52,15 @@ AISecOps Interceptor is to AI agents what application security middleware is to 
 It is designed for developers building agents that can call tools, trigger workflows, access sensitive data, or interact with real infrastructure. Instead of scattering security checks across application code, AISecOps Interceptor centralizes runtime governance in one place.
 
 
-In practical terms, the interceptor sits between your **agent framework** and the **tools or APIs** the agent attempts to call. Every execution request passes through policy evaluation, approval workflows, and audit logging before the action occurs.
+In practical terms, the interceptor sits between your **agent framework** and the **tools or APIs** the agent attempts to call. Every execution request passes through capability gating, policy evaluation, approval workflows, and audit logging before the action occurs.
 
 Release metadata:
 
-- License: [Apache License 2.0](LICENSE)
+- License: [MIT](LICENSE)
 - Release notes: [CHANGELOG.md](CHANGELOG.md)
 
-This project is licensed under the **Apache License 2.0**.
-See the `LICENSE` and `NOTICE` files for full legal details and attribution information.
+This project is licensed under the **MIT License**.
+See [LICENSE](LICENSE) for the full license text.
 
 ## Why this exists
 
@@ -114,6 +114,7 @@ Current implementation includes:
 
 - Interceptor core
 - Runtime context propagation
+- Capability-gated tool execution
 - Policy evaluation
 - Optional declarative rule engine
 - YAML policy bundles with validation
@@ -162,20 +163,23 @@ A --> B[Framework Adapter]
 
 B --> C[Runtime Context Builder]
 
-C --> D[AISecOps Interceptor]
+C --> D[Capability Gate]
 
-D --> E[Decision Engine]
+D --> E[AISecOps Interceptor]
 
-E --> F[Execution Gate]
+E --> F[Decision Engine]
 
-F --> G[Tool / API Execution]
+F --> G[Execution Gate]
 
-G --> H[Audit Event]
+G --> H[Tool / API Execution]
+
+H --> I[Audit Event]
 ```
 
 This is the core execution path developers integrate with:
 
 - agent framework builds runtime context
+- capability gate checks granted capabilities against tool mappings
 - interceptor evaluates policy and rules
 - execution gate decides allow, block, or approval
 - runtime events are emitted to audit sinks
@@ -285,6 +289,7 @@ create_llm_client(LLMConfig)
 # Rule-based policy
 
 `PolicyEngine` can evaluate an ordered set of declarative rules before falling back to the existing config-driven checks.
+When `RuntimeContext.allowed_capabilities` is provided, a capability gate runs before policy evaluation. That gate maps granted capabilities to tool names and blocks any tool request that is not explicitly granted.
 
 Each rule supports:
 
@@ -294,6 +299,17 @@ Each rule supports:
 - `action`: `allow`, `block`, or `require_approval`
 
 If rules are provided, the first matching rule wins and overrides the default policy behavior. If no rule matches, the existing blocked-tool, dangerous-argument, allowlist, approval, and monitored-tool logic still applies. The current test suite covers allow, block, require-approval, and sensitivity-based rule evaluation.
+
+Example capability mapping:
+
+```python
+capability_mapping = {
+    "cap_service_ops": ["restart_service"],
+    "cap_customer_read": ["read_customer"],
+}
+```
+
+If an agent receives `allowed_capabilities=["cap_service_ops"]`, it can request `restart_service`. If the capability list is omitted, current behavior remains unchanged and the interceptor falls back to the existing policy flow.
 
 Example:
 
@@ -544,7 +560,7 @@ Current tests validate:
 Example test output:
 
 ```
-57 passed
+61 passed
 ```
 
 ---

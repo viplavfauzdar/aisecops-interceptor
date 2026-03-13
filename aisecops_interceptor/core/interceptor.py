@@ -5,6 +5,7 @@ from typing import Any
 
 from aisecops_interceptor.core.approval import ApprovalStore
 from aisecops_interceptor.core.audit import AuditLogger
+from aisecops_interceptor.core.capability_registry import CapabilityRegistry
 from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.events import RuntimeEvent
 from aisecops_interceptor.core.exceptions import ApprovalRequiredError, PolicyViolationError, ToolNotFoundError
@@ -21,15 +22,33 @@ class AgentInterceptor:
         policy_engine: PolicyEngine,
         audit_logger: AuditLogger,
         approval_store: ApprovalStore | None = None,
+        capability_registry: CapabilityRegistry | None = None,
     ) -> None:
         self.policy_engine = policy_engine
         self.audit_logger = audit_logger
         self.approval_store = approval_store or ApprovalStore()
+        self.capability_registry = capability_registry or CapabilityRegistry()
         self.execution_gate = ExecutionGate()
 
     def intercept(self, request: InterceptionRequest) -> Any:
         context = request.context
         tool_call = context.to_tool_call()
+        capability_denial_reason = self._capability_denial_reason(context)
+        if capability_denial_reason is not None:
+            self.audit_logger.log(
+                RuntimeEvent.tool_event(
+                    event_type="tool_blocked",
+                    decision="blocked",
+                    context=context,
+                    allowed=False,
+                    reason=capability_denial_reason,
+                    risk_level="medium",
+                    matched_rule="capability_gate",
+                    approval_id=request.approval_id,
+                )
+            )
+            raise PolicyViolationError(capability_denial_reason)
+
         decision = self.evaluate(agent_name=context.agent_name, tool_call=tool_call, context=context)
 
         if decision.requires_approval and not self.approval_store.is_approved(request.approval_id):
@@ -110,6 +129,20 @@ class AgentInterceptor:
         context: RuntimeContext | None = None,
     ):
         return self.policy_engine.evaluate(agent_name=agent_name, tool_call=tool_call, context=context)
+
+    def _capability_denial_reason(self, context: RuntimeContext) -> str | None:
+        if context.allowed_capabilities is None or context.tool_name is None:
+            return None
+        if self.capability_registry.is_tool_allowed(context.tool_name, context.allowed_capabilities):
+            return None
+
+        required_capabilities = self.capability_registry.required_capabilities_for_tool(context.tool_name)
+        if required_capabilities:
+            capability_list = ", ".join(required_capabilities)
+            return (
+                f"Tool '{context.tool_name}' requires one of the granted capabilities: {capability_list}"
+            )
+        return f"Tool '{context.tool_name}' is not granted by the provided capabilities"
 
     def execute(
         self,

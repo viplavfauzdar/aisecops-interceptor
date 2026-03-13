@@ -19,6 +19,7 @@ class RuntimeContext:
     actor: str | None = None
     environment: str = "dev"
     correlation_id: str | None = None
+    allowed_capabilities: list[str] | None = None
     tags: dict[str, str] = field(default_factory=dict)
     metadata: dict[str, str] = field(default_factory=dict)
 
