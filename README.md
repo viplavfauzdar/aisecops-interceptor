@@ -43,6 +43,9 @@ Release metadata:
 - License: [Apache License 2.0](LICENSE)
 - Release notes: [CHANGELOG.md](CHANGELOG.md)
 
+This project is licensed under the **Apache License 2.0**.
+See the `LICENSE` and `NOTICE` files for full legal details and attribution information.
+
 ## Why this exists
 
 AI agents can call tools, execute code, access data, and trigger real-world actions.
