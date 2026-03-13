@@ -1,6 +1,21 @@
-# AISecOps Interceptor
+# 🛡️ AISecOps Interceptor
+**The missing runtime security layer for AI Agents.**
 
-Runtime security and governance layer for AI agents.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
+
+AISecOps Interceptor provides a framework-agnostic control plane to detect prompt injections, prevent secret leakage, and enforce human-in-the-loop approvals before your agents execute dangerous tools.
+
+## ⚡ Quick Start
+
+### 1. Installation
+```bash
+git clone https://github.com/viplavfauzdar/aisecops-interceptor.git
+cd aisecops-interceptor
+pip install -e .
+```
+
+## Runtime security and governance layer for AI agents.
 
 AISecOps Interceptor is to AI agents what application security middleware is to web apps: a **framework‑agnostic runtime security layer** that sits between an agent runtime and the tools, APIs, or actions it wants to execute.
 
