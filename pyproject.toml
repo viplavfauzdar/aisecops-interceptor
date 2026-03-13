@@ -19,7 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-  "pytest==8.4.1",
+  "pytest==9.0.2",
 ]
 
 [tool.setuptools.packages.find]
