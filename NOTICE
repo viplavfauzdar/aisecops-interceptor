@@ -1,0 +1,12 @@
+AISecOps Interceptor
+
+Copyright 2026 Viplav Fauzdar
+
+This project is licensed under the Apache License, Version 2.0.
+
+The AISecOps Interceptor project provides a runtime security and governance layer for AI agents, including policy enforcement, prompt and output inspection, approval workflows, and audit event pipelines.
+
+For license details see the LICENSE file in this repository.
+
+Project repository:
+https://github.com/viplavfauzdar/aisecops-interceptor
