@@ -1,0 +1,10 @@
+name: "AISecOps CodeQL Config"
+
+paths:
+  - aisecops_interceptor
+  - examples
+
+paths-ignore:
+  - tests
+  - "**/__pycache__"
+  - ".venv"

@@ -95,6 +95,9 @@ pytest -q
 
 Both must succeed.
 
+In addition, GitHub Actions CI and security workflows must pass on your pull request.
+This includes test validation, Bandit, pip-audit, Gitleaks, and CodeQL checks.
+
 ---
 
 # Examples and demos
@@ -127,6 +130,7 @@ Pull requests should include:
 - description of the change
 - architectural rationale
 - confirmation that tests pass
+- confirmation that CI and security checks pass
 
 Large architectural changes should be discussed before implementation.
 

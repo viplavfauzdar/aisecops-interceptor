@@ -5,8 +5,15 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
+[![CI](https://github.com/viplavfauzdar/aisecops-interceptor/actions/workflows/ci.yml/badge.svg)](https://github.com/viplavfauzdar/aisecops-interceptor/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/viplavfauzdar/aisecops-interceptor/actions/workflows/security.yml/badge.svg)](https://github.com/viplavfauzdar/aisecops-interceptor/actions/workflows/security.yml)
 
 AISecOps Interceptor provides a framework-agnostic control plane to detect prompt injections, prevent secret leakage, and enforce human-in-the-loop approvals before your agents execute dangerous tools.
+
+## CI and Security
+
+All pull requests and pushes to `main` are validated by GitHub Actions.
+The pipeline runs compile checks, tests, and demo smoke tests in CI, plus Bandit, pip-audit, Gitleaks, and CodeQL in the security workflow.
 
 ## ⚡ Quick Start
 
