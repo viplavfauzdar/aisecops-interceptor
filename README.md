@@ -409,6 +409,8 @@ policy = PolicyEngine(
 
 # Policy bundles
 
+Declarative policy and capability mappings now live under the top-level `policies/` directory. Policy rules load from `policies/policies.yaml`, and capability mappings load from `policies/capabilities.yaml` by default.
+
 Declarative rules can also be loaded from YAML bundles instead of Python dictionaries.
 
 Example bundle:
@@ -434,7 +436,7 @@ Supported rule fields:
 Load a bundle with:
 
 ```python
-policy = PolicyEngine.from_yaml("policies/production.yaml")
+policy = PolicyEngine.from_yaml()
 ```
 
 YAML bundles are validated before rules are constructed, and invalid bundles raise a validation error.
@@ -489,6 +491,7 @@ aisecops_interceptor/
     simple_adapter.py
 
 policies/
+  policies.yaml
   capabilities.yaml
 
 examples/
@@ -651,7 +654,7 @@ Current tests validate:
 Latest verified local run:
 
 ```
-65 passed
+67 passed
 ```
 
 ---

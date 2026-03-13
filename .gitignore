@@ -23,6 +23,7 @@ pip-wheel-metadata/
 .coverage
 .coverage.*
 htmlcov/
+.cache/
 
 # Environment / secrets
 .env
@@ -46,6 +47,7 @@ logs/
 
 # Local runtime data
 audit/*.jsonl
+*.jsonl
 
 # IDE/editor
 .idea/
@@ -56,3 +58,6 @@ audit/*.jsonl
 # OS files
 .DS_Store
 Thumbs.db
+
+# Coverage reports
+coverage.xml

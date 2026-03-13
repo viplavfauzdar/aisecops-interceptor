@@ -13,7 +13,7 @@ from aisecops_interceptor.core.policy import PolicyEngine
 from aisecops_interceptor.integrations.langgraph_adapter import LangGraphMiddleware, LangGraphToolAdapter
 
 
-policy = PolicyEngine.from_yaml_file("aisecops_interceptor/config/policies.yaml")
+policy = PolicyEngine.from_yaml_file()
 audit = AuditLogger()
 approvals = ApprovalStore()
 interceptor = AgentInterceptor(policy_engine=policy, audit_logger=audit, approval_store=approvals)

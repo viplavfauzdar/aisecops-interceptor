@@ -21,7 +21,7 @@ def delete_database(name: str) -> dict:
 
 
 if __name__ == "__main__":
-    policy = PolicyEngine.from_yaml_file("aisecops_interceptor/config/policies.yaml")
+    policy = PolicyEngine.from_yaml_file()
     audit = AuditLogger()
     interceptor = AgentInterceptor(policy_engine=policy, audit_logger=audit)
 

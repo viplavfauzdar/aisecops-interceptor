@@ -14,7 +14,7 @@ from aisecops_interceptor.core.policy import PolicyEngine
 from aisecops_interceptor.integrations.openclaw_adapter import OpenClawToolRunnerAdapter
 
 app = FastAPI(title="AISecOps Interceptor", version="0.3.0")
-policy = PolicyEngine.from_yaml_file("aisecops_interceptor/config/policies.yaml")
+policy = PolicyEngine.from_yaml_file()
 audit = AuditLogger(log_path="audit/audit.jsonl")
 approvals = ApprovalStore(store_path="audit/approvals.jsonl")
 interceptor = AgentInterceptor(policy_engine=policy, audit_logger=audit, approval_store=approvals)

@@ -11,7 +11,7 @@ class CapabilityRegistry:
         }
 
     @classmethod
-    def from_yaml(cls, path: str) -> "CapabilityRegistry":
+    def from_yaml(cls, path: str | None = None) -> "CapabilityRegistry":
         bundle = load_capability_bundle(path)
         return cls(bundle.capabilities)
 
