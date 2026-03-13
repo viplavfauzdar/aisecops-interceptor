@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 from unittest.mock import Mock, patch
 
 import httpx
@@ -66,7 +68,43 @@ def test_webhook_event_sink_posts_runtime_event_json() -> None:
     mock_post.assert_called_once_with(
         "https://example.com/webhook",
         json=event.to_dict(),
+        headers=None,
         timeout=2.5,
+    )
+    response.raise_for_status.assert_called_once_with()
+
+
+def test_webhook_event_sink_includes_hmac_signature_header() -> None:
+    sink = WebhookEventSink(
+        "https://example.com/webhook",
+        secret_key="top-secret",
+        header_name="X-Test-Signature",
+    )
+    context = RuntimeContext(agent_name="demo-agent", tool_name="read_customer")
+    event = RuntimeEvent.tool_event(
+        event_type="tool_allowed",
+        decision="allowed",
+        context=context,
+        allowed=True,
+        reason="Allowed by policy",
+    )
+    response = Mock()
+    response.raise_for_status = Mock()
+    payload = WebhookEventSink._serialize_event(event)
+    expected_signature = hmac.new(
+        b"top-secret",
+        payload.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+    with patch("aisecops_interceptor.core.event_sink.httpx.post", return_value=response) as mock_post:
+        sink.emit(event)
+
+    mock_post.assert_called_once_with(
+        "https://example.com/webhook",
+        json=event.to_dict(),
+        headers={"X-Test-Signature": expected_signature},
+        timeout=5.0,
     )
     response.raise_for_status.assert_called_once_with()
 
@@ -125,6 +163,32 @@ def test_webhook_event_sink_raises_after_exhausting_retries() -> None:
 
     assert mock_post.call_count == 3
     assert mock_sleep.call_count == 2
+
+
+def test_webhook_event_sink_signature_matches_expected_hmac() -> None:
+    sink = WebhookEventSink("https://example.com/webhook", secret_key="another-secret")
+    context = RuntimeContext(agent_name="demo-agent", tool_name="read_customer")
+    event = RuntimeEvent.tool_event(
+        event_type="tool_executed",
+        decision="allowed",
+        context=context,
+        allowed=True,
+        reason="Tool executed",
+    )
+    response = Mock()
+    response.raise_for_status = Mock()
+    payload = WebhookEventSink._serialize_event(event)
+    expected_signature = hmac.new(
+        b"another-secret",
+        payload.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+    with patch("aisecops_interceptor.core.event_sink.httpx.post", return_value=response) as mock_post:
+        sink.emit(event)
+
+    sent_headers = mock_post.call_args.kwargs["headers"]
+    assert sent_headers == {"X-AISecOps-Signature": expected_signature}
 
 
 def test_webhook_sink_coexists_with_file_and_memory_sinks(tmp_path) -> None:

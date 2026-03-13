@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hmac
+import hashlib
 import json
 import time
 from pathlib import Path
@@ -78,19 +80,41 @@ class WebhookEventSink:
         timeout: float = 5.0,
         retry_count: int = 2,
         backoff_delay: float = 0.05,
+        secret_key: str | None = None,
+        header_name: str = "X-AISecOps-Signature",
     ) -> None:
         self.url = url
         self.timeout = timeout
         self.retry_count = retry_count
         self.backoff_delay = backoff_delay
+        self.secret_key = secret_key
+        self.header_name = header_name
+
+    @staticmethod
+    def _serialize_event(event: RuntimeEvent) -> str:
+        return json.dumps(event.to_dict(), sort_keys=True, separators=(",", ":"))
+
+    def _headers_for_event(self, payload: str) -> dict[str, str] | None:
+        if self.secret_key is None:
+            return None
+        signature = hmac.new(
+            self.secret_key.encode("utf-8"),
+            payload.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+        return {self.header_name: signature}
 
     def emit(self, event: RuntimeEvent) -> None:
+        payload = event.to_dict()
+        serialized_payload = self._serialize_event(event)
+        headers = self._headers_for_event(serialized_payload)
         last_error: httpx.HTTPError | None = None
         for attempt in range(self.retry_count + 1):
             try:
                 response = httpx.post(
                     self.url,
-                    json=event.to_dict(),
+                    json=payload,
+                    headers=headers,
                     timeout=self.timeout,
                 )
                 response.raise_for_status()
