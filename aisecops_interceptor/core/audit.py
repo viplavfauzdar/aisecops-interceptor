@@ -22,7 +22,10 @@ class AuditLogger:
 
     def log(self, event: RuntimeEvent) -> None:
         for sink in self.sinks:
-            sink.emit(event)
+            try:
+                sink.emit(event)
+            except Exception:
+                continue
 
     def events(self) -> Iterable[RuntimeEvent]:
         return self.in_memory_sink.events()

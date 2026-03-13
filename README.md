@@ -150,6 +150,7 @@ Runtime events can be persisted to JSONL and retrieved through the API for downs
 The `/audit` endpoint supports optional query parameters: `event_type`, `stage`, `agent_name`, `tool_name`, `correlation_id`, and `limit`.
 `AuditLogger` can also emit the same `RuntimeEvent` records to multiple sinks, such as JSONL persistence and additional in-memory or external streaming adapters.
 Supported sink types include file-backed JSONL persistence, in-memory collection, and webhook delivery to external HTTP endpoints.
+Sink delivery is isolated per sink, so one failing sink does not block the others.
 
 Security violations raise:
 

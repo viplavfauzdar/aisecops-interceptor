@@ -94,3 +94,49 @@ def test_webhook_sink_coexists_with_file_and_memory_sinks(tmp_path) -> None:
     assert [item.event_type for item in extra_memory_sink.events()] == ["tool_executed"]
     assert [item.event_type for item in file_sink.events()] == ["tool_executed"]
     mock_post.assert_called_once()
+
+
+def test_failing_webhook_sink_does_not_stop_file_sink(tmp_path) -> None:
+    file_sink = FileEventSink(str(tmp_path / "runtime-events.jsonl"))
+    webhook_sink = WebhookEventSink("https://example.com/webhook")
+    logger = AuditLogger(sinks=[file_sink, webhook_sink])
+    context = RuntimeContext(agent_name="demo-agent", tool_name="read_customer")
+    event = RuntimeEvent.tool_event(
+        event_type="tool_executed",
+        decision="allowed",
+        context=context,
+        allowed=True,
+        reason="Tool executed",
+    )
+
+    with patch(
+        "aisecops_interceptor.core.event_sink.httpx.post",
+        side_effect=httpx.HTTPError("boom"),
+    ):
+        logger.log(event)
+
+    assert [item.event_type for item in logger.events()] == ["tool_executed"]
+    assert [item.event_type for item in file_sink.events()] == ["tool_executed"]
+
+
+def test_failing_webhook_sink_does_not_stop_memory_sink() -> None:
+    extra_memory_sink = InMemoryEventSink()
+    webhook_sink = WebhookEventSink("https://example.com/webhook")
+    logger = AuditLogger(sinks=[extra_memory_sink, webhook_sink])
+    context = RuntimeContext(agent_name="demo-agent", tool_name="read_customer")
+    event = RuntimeEvent.tool_event(
+        event_type="tool_allowed",
+        decision="allowed",
+        context=context,
+        allowed=True,
+        reason="Allowed by policy",
+    )
+
+    with patch(
+        "aisecops_interceptor.core.event_sink.httpx.post",
+        side_effect=httpx.HTTPError("boom"),
+    ):
+        logger.log(event)
+
+    assert [item.event_type for item in logger.events()] == ["tool_allowed"]
+    assert [item.event_type for item in extra_memory_sink.events()] == ["tool_allowed"]
