@@ -9,17 +9,44 @@ description = "Runtime security interceptor for AI agents"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
 authors = [{name = "Viplav Fauzdar"}]
-dependencies = [
-  "fastapi==0.135.1",
-  "httpx==0.28.1",
-  "pydantic==2.12.5",
-  "PyYAML==6.0.3",
-  "uvicorn==0.35.0",
+license = { file = "LICENSE" }
+keywords = [
+  "ai",
+  "agents",
+  "security",
+  "runtime-governance",
+  "llm",
+  "policy-engine",
 ]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Security",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+  "fastapi>=0.135,<0.136",
+  "httpx>=0.28,<0.29",
+  "pydantic>=2.12,<3",
+  "PyYAML>=6.0,<7",
+  "uvicorn>=0.41,<0.42",
+]
+
+[project.urls]
+Homepage = "https://github.com/viplavfauzdar/aisecops-interceptor"
+Repository = "https://github.com/viplavfauzdar/aisecops-interceptor"
+Issues = "https://github.com/viplavfauzdar/aisecops-interceptor/issues"
+Changelog = "https://github.com/viplavfauzdar/aisecops-interceptor/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [
-  "pytest==9.0.2",
+  "pytest==8.4.1",
 ]
 
 [tool.setuptools.packages.find]
