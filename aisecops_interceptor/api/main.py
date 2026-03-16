@@ -4,6 +4,7 @@ from dataclasses import asdict
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
+from fastapi.responses import RedirectResponse
 
 from aisecops_interceptor.core.approval import ApprovalStore
 from aisecops_interceptor.core.audit import AuditLogger
@@ -75,10 +76,13 @@ class OpenClawExecuteRequest(BaseModel):
     correlation_id: str | None = None
 
 
+@app.get("/", include_in_schema=False)
+def root() -> RedirectResponse:
+    return RedirectResponse(url="/docs")
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
-
 
 @app.post("/execute")
 def execute(request: ExecuteRequest) -> dict:

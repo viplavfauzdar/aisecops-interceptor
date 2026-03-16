@@ -3,11 +3,32 @@
 **A framework-agnostic runtime control plane for agent security, policy enforcement, and auditability.**
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11–3.13](https://img.shields.io/badge/python-3.11--3.13-blue.svg)](https://www.python.org/downloads/)
 [![CI](https://github.com/viplavfauzdar/aisecops-interceptor/actions/workflows/ci.yml/badge.svg)](https://github.com/viplavfauzdar/aisecops-interceptor/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/viplavfauzdar/aisecops-interceptor/actions/workflows/security.yml/badge.svg)](https://github.com/viplavfauzdar/aisecops-interceptor/actions/workflows/security.yml)
 
+[//]: # (Table of Contents insertion point)
+
+## Table of Contents
+
+- [Getting Started](#-getting-started)
+- [Real-world attack simulation](#real-world-attack-simulation)
+- [Threat model](#threat-model)
+- [Included capabilities](#included-capabilities)
+- [Policy bundles](#policy-bundles)
+- [Repository layout](#repository-layout)
+- [Hack the agent demo](#hack-the-agent-demo)
+- [Full local quick start](#full-local-quick-start)
+- [Architecture direction](#architecture-direction)
+
 AISecOps Interceptor provides a framework-agnostic control plane to detect prompt injections, prevent secret leakage, and enforce human-in-the-loop approvals before your agents execute dangerous tools.
+
+### Who this is for
+
+- developers building AI agents
+- teams deploying large language model (LLM) powered automation
+- security engineers reviewing agent safety
+- platform teams building internal AI infrastructure
 
 ## CI and Security
 
@@ -123,6 +144,49 @@ Typical outcomes:
 - sensitive actions can require human approval
 - runtime events are persisted for audit and incident review
 
+## Why this matters
+
+Modern AI agents can:
+
+- call APIs
+- execute infrastructure actions
+- access sensitive data
+- trigger real-world workflows
+
+Without runtime controls, a single prompt injection can turn an agent into a security incident.
+
+### Without runtime security
+
+```
+User prompt
+   ↓
+LLM decides tool to call
+   ↓
+Agent executes tool
+   ↓
+Sensitive action happens
+```
+
+### With AISecOps Interceptor
+
+```
+User prompt
+   ↓
+Prompt guard
+   ↓
+LLM response inspection
+   ↓
+Capability gate
+   ↓
+Policy engine
+   ↓
+Execution gate
+   ↓
+Tool runs only if approved
+```
+
+AISecOps Interceptor acts as the **runtime security layer for agentic systems**.
+
 ---
 
 # What the interceptor provides
@@ -159,6 +223,37 @@ AISecOps Interceptor is designed to defend against common agent-runtime failure 
 | Unauthorized tool invocation | Capability gate |
 | Sensitive action without review | Approval workflow |
 | Missing execution traceability | Runtime event logging |
+
+## Security boundaries
+
+AISecOps Interceptor is a runtime security and governance layer for agentic systems.
+
+### What it helps protect
+
+- prompt injection attempts influencing downstream actions
+- secret leakage patterns in model output
+- unauthorized tool invocation
+- sensitive operations executed without approval
+- missing runtime traceability for agent actions
+
+### What it does not replace
+
+AISecOps Interceptor is not a replacement for:
+
+- secure application code
+- authentication and identity systems
+- network security controls
+- secure database design
+- infrastructure patching and vulnerability management
+
+### Assumptions
+
+The interceptor assumes:
+
+- the surrounding application defines or integrates available tools
+- capability mappings and policy bundles are intentionally managed
+- downstream tools and APIs still enforce their own security controls
+- the interceptor sits directly in the execution path between the agent and the tool runtime
 
 ---
 
@@ -323,11 +418,16 @@ Which prevents unsafe model responses from reaching the agent runtime.
 
 # Hack the agent demo
 
+
 Run the end-to-end adversarial demo with:
 
 ```bash
 python -m examples.hack_the_agent_demo
 ```
+
+Example output when the interceptor blocks a malicious agent attempt:
+
+![AISecOps Interceptor blocking agent attack](docs/hack-the-agent-demo.png)
 
 What it proves:
 
@@ -611,26 +711,18 @@ python -m examples.policy_bundle_demo
 
 ## Minimal example
 
-```python
-from aisecops_interceptor.core.context import RuntimeContext
-from aisecops_interceptor.core.interceptor import AgentInterceptor
-from aisecops_interceptor.core.models import InterceptionRequest
-
-# In practice, use the provided policy engine / adapters from the repo.
-context = RuntimeContext(
-    agent_name="ops_agent",
-    tool_name="restart_service",
-    sensitivity_level="high",
-)
-
-# interceptor.intercept(...) evaluates policy and returns
-# allow / block / require_approval before the tool executes.
-```
-
-For a complete end-to-end example, run:
+For a working end‑to‑end example showing interception, policy evaluation, and tool execution control, run:
 
 ```bash
 python -m examples.agent_demo
+```
+
+Additional demos:
+
+```bash
+python -m examples.hack_the_agent_demo
+python -m examples.capabilities_demo
+python -m examples.policy_bundle_demo
 ```
 
 `pyproject.toml` is the source of truth for runtime and development dependencies. `requirements.txt` is a thin wrapper around the editable install with the `dev` extra.
