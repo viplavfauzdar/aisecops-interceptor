@@ -53,6 +53,10 @@ def restart_service(service: str) -> dict[str, str]:
     return {"service": service, "status": "restarted"}
 
 
+def export_data(scope: str) -> dict[str, str]:
+    return {"scope": scope, "status": "exported"}
+
+
 async def main() -> None:
     audit_path = Path("audit/agent-demo-runtime-events.jsonl")
     audit_path.parent.mkdir(parents=True, exist_ok=True)
@@ -201,6 +205,35 @@ async def main() -> None:
         )
     except PolicyViolationError as exc:
         print({"capability_blocked": True, "reason": str(exc)})
+
+    print("\n9) Default high-risk preset example")
+    high_risk_interceptor = AgentInterceptor(
+        policy_engine=PolicyEngine(
+            {
+                "agents": {
+                    "ops_agent": {
+                        "allowed_tools": ["export_data"],
+                    },
+                },
+            }
+        ),
+        audit_logger=AuditLogger(),
+        approval_store=DemoApprovalStore(),
+    )
+    try:
+        high_risk_interceptor.intercept(
+            InterceptionRequest(
+                context=RuntimeContext(
+                    agent_name="ops_agent",
+                    tool_name="export_data",
+                    arguments={"scope": "customers"},
+                    framework="demo",
+                ),
+                tool_registry={"export_data": export_data},
+            )
+        )
+    except ApprovalRequiredError as exc:
+        print({"preset_requires_approval": True, "reason": str(exc)})
 
 
 if __name__ == "__main__":

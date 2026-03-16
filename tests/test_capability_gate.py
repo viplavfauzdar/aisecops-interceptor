@@ -40,16 +40,16 @@ def test_allowed_capability_permits_tool_execution() -> None:
     result = interceptor.intercept(
         InterceptionRequest(
             context=RuntimeContext(
-                agent_name="ops_agent",
-                tool_name="restart_service",
-                arguments={"service": "orders"},
-                allowed_capabilities=["cap_service_ops"],
+                agent_name="sales_agent",
+                tool_name="read_customer",
+                arguments={"customer_id": "123"},
+                allowed_capabilities=["cap_customer_read"],
             ),
-            tool_registry={"restart_service": lambda service: {"service": service, "status": "restarted"}},
+            tool_registry={"read_customer": lambda customer_id: {"customer_id": customer_id}},
         )
     )
 
-    assert result == {"service": "orders", "status": "restarted"}
+    assert result == {"customer_id": "123"}
 
 
 def test_missing_capability_blocks_tool_execution() -> None:

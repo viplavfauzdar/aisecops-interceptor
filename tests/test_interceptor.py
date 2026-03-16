@@ -207,6 +207,29 @@ def test_runtime_events_are_persisted_and_read_back(tmp_path) -> None:
     assert all(isinstance(event, RuntimeEvent) for event in persisted)
 
 
+def test_high_risk_preset_requires_approval_end_to_end() -> None:
+    policy = PolicyEngine(
+        {
+            "agents": {
+                "ops_agent": {
+                    "allowed_tools": ["export_data"],
+                },
+            },
+        }
+    )
+    interceptor = AgentInterceptor(policy_engine=policy, audit_logger=AuditLogger(), approval_store=ApprovalStore())
+
+    try:
+        interceptor.execute(
+            agent_name="ops_agent",
+            tool_call=ToolCall(name="export_data", arguments={"scope": "customers"}),
+            tool_registry={"export_data": lambda scope: {"scope": scope}},
+        )
+        assert False, "Expected ApprovalRequiredError"
+    except ApprovalRequiredError as exc:
+        assert "default high-risk preset" in str(exc)
+
+
 def test_dry_run_does_not_execute_tool_but_returns_allow_decision() -> None:
     interceptor = make_interceptor()
     executed = {"called": False}

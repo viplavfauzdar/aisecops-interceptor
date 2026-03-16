@@ -9,6 +9,13 @@ from aisecops_interceptor.policy.rule_engine import RuleEngine
 from aisecops_interceptor.policy.rules import Rule
 from aisecops_interceptor.policy.schema import parse_policy_bundle
 
+DEFAULT_HIGH_RISK_TOOLS = (
+    "restart_service",
+    "execute_shell",
+    "delete_user",
+    "export_data",
+)
+
 
 class PolicyEngine:
     def __init__(self, config: dict[str, Any], rules: list[Rule] | None = None) -> None:
@@ -16,6 +23,14 @@ class PolicyEngine:
         resolved_rules = rules if rules is not None else bundle.rules
         self.config = bundle.config
         self.rule_engine = RuleEngine(resolved_rules)
+        configured_high_risk_tools = tuple(str(tool) for tool in self.config.get("high_risk_tools", []))
+        high_risk_mode = str(self.config.get("high_risk_tools_mode", "extend")).lower()
+        if high_risk_mode == "override":
+            self.high_risk_tools = configured_high_risk_tools
+        else:
+            self.high_risk_tools = tuple(
+                dict.fromkeys(DEFAULT_HIGH_RISK_TOOLS + configured_high_risk_tools)
+            )
 
     @classmethod
     def from_yaml(cls, path: str | None = None) -> "PolicyEngine":
@@ -89,6 +104,15 @@ class PolicyEngine:
                 allowed=False,
                 reason=f"Tool '{tool_call.name}' requires human approval",
                 matched_rule=f"agents.{agent_name}.approval_required_tools",
+                risk_level="high",
+                requires_approval=True,
+            )
+
+        if tool_call.name in set(self.high_risk_tools):
+            return PolicyDecision(
+                allowed=False,
+                reason=f"Tool '{tool_call.name}' is in the default high-risk preset and requires human approval",
+                matched_rule="high_risk_tools",
                 risk_level="high",
                 requires_approval=True,
             )

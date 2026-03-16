@@ -507,6 +507,7 @@ create_llm_client(LLMConfig)
 
 `PolicyEngine` can evaluate an ordered set of declarative rules before falling back to the existing config-driven checks.
 When `RuntimeContext.allowed_capabilities` is provided, a capability gate runs before policy evaluation. That gate maps granted capabilities to tool names and blocks any tool request that is not explicitly granted.
+The policy layer also includes a built-in high-risk tool preset. By default, tools such as `restart_service`, `execute_shell`, `delete_user`, and `export_data` require approval unless an explicit policy rule overrides that outcome.
 
 Each rule supports:
 
@@ -581,6 +582,7 @@ policy = PolicyEngine.from_yaml()
 ```
 
 YAML bundles are validated before rules are constructed, and invalid bundles raise a validation error.
+YAML policy bundles can extend the built-in high-risk preset with `high_risk_tools`, or replace it entirely with `high_risk_tools_mode: override`.
 
 ---
 
@@ -839,7 +841,7 @@ Current tests validate:
 Latest verified local run:
 
 ```
-74 passed
+78 passed
 ```
 
 ---

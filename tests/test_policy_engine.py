@@ -72,3 +72,67 @@ def test_rule_engine_sensitivity_rule_works() -> None:
     assert decision.allowed is False
     assert decision.requires_approval is False
     assert decision.matched_rule == "rules[0]"
+
+
+def test_default_high_risk_preset_requires_approval() -> None:
+    engine = PolicyEngine(
+        {
+            "agents": {
+                "ops_agent": {
+                    "allowed_tools": ["export_data"],
+                },
+            },
+        }
+    )
+
+    decision = engine.evaluate(
+        agent_name="ops_agent",
+        tool_call=ToolCall(name="export_data", arguments={"scope": "customers"}),
+    )
+
+    assert decision.allowed is False
+    assert decision.requires_approval is True
+    assert decision.matched_rule == "high_risk_tools"
+
+
+def test_explicit_rule_overrides_high_risk_preset() -> None:
+    engine = PolicyEngine(
+        {
+            "agents": {
+                "ops_agent": {
+                    "allowed_tools": ["export_data"],
+                },
+            },
+        },
+        rules=[Rule(tool_name="export_data", agent_name="ops_agent", action="allow")],
+    )
+
+    decision = engine.evaluate(
+        agent_name="ops_agent",
+        tool_call=ToolCall(name="export_data", arguments={"scope": "customers"}),
+    )
+
+    assert decision.allowed is True
+    assert decision.requires_approval is False
+    assert decision.matched_rule == "rules[0]"
+
+
+def test_non_preset_safe_tool_remains_allowed() -> None:
+    engine = PolicyEngine(
+        {
+            "agents": {
+                "sales_agent": {
+                    "allowed_tools": ["read_customer"],
+                },
+            },
+        }
+    )
+
+    decision = engine.evaluate(
+        agent_name="sales_agent",
+        tool_call=ToolCall(name="read_customer", arguments={"customer_id": "123"}),
+    )
+
+    assert decision.allowed is True
+    assert decision.requires_approval is False
+    assert decision.reason == "Allowed by policy"

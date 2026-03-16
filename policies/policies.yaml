@@ -12,6 +12,9 @@ dangerous_argument_patterns:
   - ignore previous instructions
   - rm -rf
 
+high_risk_tools:
+  - restart_service
+
 agents:
   sales_agent:
     allowed_tools:
