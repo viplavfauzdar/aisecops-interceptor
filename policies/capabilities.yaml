@@ -1,0 +1,9 @@
+capabilities:
+  cap_service_ops:
+    tools:
+      - restart_service
+      - stop_service
+
+  cap_customer_read:
+    tools:
+      - read_customer

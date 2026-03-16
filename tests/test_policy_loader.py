@@ -78,3 +78,10 @@ def test_policy_engine_from_yaml_executes_loaded_rules(tmp_path) -> None:
 
     assert decision.allowed is False
     assert decision.matched_rule == "rules[0]"
+
+
+def test_policy_loader_defaults_to_external_bundle_path() -> None:
+    bundle = PolicyLoader.from_yaml()
+
+    assert "sales_agent" in bundle.config["agents"]
+    assert "delete_database" in bundle.config["blocked_tools"]

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from aisecops_interceptor.policy.capabilities import load_capability_bundle
+
 
 class CapabilityRegistry:
     def __init__(self, mapping: dict[str, list[str] | set[str] | tuple[str, ...]] | None = None) -> None:
@@ -7,6 +9,11 @@ class CapabilityRegistry:
             capability: set(tool_names)
             for capability, tool_names in (mapping or {}).items()
         }
+
+    @classmethod
+    def from_yaml(cls, path: str | None = None) -> "CapabilityRegistry":
+        bundle = load_capability_bundle(path)
+        return cls(bundle.capabilities)
 
     def required_capabilities_for_tool(self, tool_name: str) -> tuple[str, ...]:
         return tuple(

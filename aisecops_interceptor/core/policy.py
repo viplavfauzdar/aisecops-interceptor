@@ -18,12 +18,12 @@ class PolicyEngine:
         self.rule_engine = RuleEngine(resolved_rules)
 
     @classmethod
-    def from_yaml(cls, path: str) -> "PolicyEngine":
+    def from_yaml(cls, path: str | None = None) -> "PolicyEngine":
         bundle = PolicyLoader.from_yaml(path)
         return cls(bundle.config, rules=bundle.rules)
 
     @classmethod
-    def from_yaml_file(cls, path: str) -> "PolicyEngine":
+    def from_yaml_file(cls, path: str | None = None) -> "PolicyEngine":
         return cls.from_yaml(path)
 
     def evaluate(

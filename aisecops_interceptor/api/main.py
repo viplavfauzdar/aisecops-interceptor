@@ -4,6 +4,7 @@ from dataclasses import asdict
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
+from fastapi.responses import RedirectResponse
 
 from aisecops_interceptor.core.approval import ApprovalStore
 from aisecops_interceptor.core.audit import AuditLogger
@@ -14,7 +15,7 @@ from aisecops_interceptor.core.policy import PolicyEngine
 from aisecops_interceptor.integrations.openclaw_adapter import OpenClawToolRunnerAdapter
 
 app = FastAPI(title="AISecOps Interceptor", version="0.3.0")
-policy = PolicyEngine.from_yaml_file("aisecops_interceptor/config/policies.yaml")
+policy = PolicyEngine.from_yaml_file()
 audit = AuditLogger(log_path="audit/audit.jsonl")
 approvals = ApprovalStore(store_path="audit/approvals.jsonl")
 interceptor = AgentInterceptor(policy_engine=policy, audit_logger=audit, approval_store=approvals)
@@ -75,10 +76,13 @@ class OpenClawExecuteRequest(BaseModel):
     correlation_id: str | None = None
 
 
+@app.get("/", include_in_schema=False)
+def root() -> RedirectResponse:
+    return RedirectResponse(url="/docs")
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
-
 
 @app.post("/execute")
 def execute(request: ExecuteRequest) -> dict:

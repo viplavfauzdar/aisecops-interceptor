@@ -10,10 +10,19 @@ class PolicyBundleValidationError(ValueError):
     """Raised when a YAML policy bundle is invalid."""
 
 
+class CapabilityBundleValidationError(ValueError):
+    """Raised when a YAML capability bundle is invalid."""
+
+
 @dataclass(slots=True)
 class PolicyBundle:
     config: dict[str, Any] = field(default_factory=dict)
     rules: list[Rule] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class CapabilityBundle:
+    capabilities: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
 
 def parse_policy_bundle(data: Any) -> PolicyBundle:
@@ -55,3 +64,41 @@ def parse_rule(data: Any) -> Rule:
         )
     except ValueError as exc:
         raise PolicyBundleValidationError(str(exc)) from exc
+
+
+def parse_capability_bundle(data: Any) -> CapabilityBundle:
+    if data is None:
+        return CapabilityBundle(capabilities={})
+    if not isinstance(data, dict):
+        raise CapabilityBundleValidationError("Capability bundle must be a mapping")
+
+    raw_capabilities = data.get("capabilities", {})
+    if not isinstance(raw_capabilities, dict):
+        raise CapabilityBundleValidationError("'capabilities' must be a mapping")
+
+    capabilities: dict[str, tuple[str, ...]] = {}
+    for capability_name, definition in raw_capabilities.items():
+        if str(capability_name).strip() == "":
+            raise CapabilityBundleValidationError("Capability names must be non-empty strings")
+        if not isinstance(definition, dict):
+            raise CapabilityBundleValidationError(
+                f"Capability '{capability_name}' must be a mapping"
+            )
+
+        raw_tools = definition.get("tools")
+        if not isinstance(raw_tools, list):
+            raise CapabilityBundleValidationError(
+                f"Capability '{capability_name}' field 'tools' must be a list"
+            )
+
+        tools: list[str] = []
+        for tool_name in raw_tools:
+            if str(tool_name).strip() == "":
+                raise CapabilityBundleValidationError(
+                    f"Capability '{capability_name}' tools must contain non-empty strings"
+                )
+            tools.append(str(tool_name))
+
+        capabilities[str(capability_name)] = tuple(tools)
+
+    return CapabilityBundle(capabilities=capabilities)
