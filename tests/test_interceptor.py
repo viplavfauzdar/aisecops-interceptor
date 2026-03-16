@@ -4,7 +4,7 @@ from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.events import RuntimeEvent
 from aisecops_interceptor.core.exceptions import ApprovalRequiredError, PolicyViolationError
 from aisecops_interceptor.core.interceptor import AgentInterceptor
-from aisecops_interceptor.core.models import InterceptionRequest, ToolCall
+from aisecops_interceptor.core.models import DryRunResult, InterceptionRequest, ToolCall
 from aisecops_interceptor.core.policy import PolicyEngine
 
 
@@ -205,3 +205,53 @@ def test_runtime_events_are_persisted_and_read_back(tmp_path) -> None:
     persisted = list(logger.persisted_events())
     assert [event.event_type for event in persisted] == ["tool_allowed", "tool_executed"]
     assert all(isinstance(event, RuntimeEvent) for event in persisted)
+
+
+def test_dry_run_does_not_execute_tool_but_returns_allow_decision() -> None:
+    interceptor = make_interceptor()
+    executed = {"called": False}
+
+    def read_customer(customer_id: str) -> dict[str, str]:
+        executed["called"] = True
+        return {"customer_id": customer_id}
+
+    result = interceptor.intercept(
+        InterceptionRequest(
+            context=RuntimeContext(
+                agent_name="sales_agent",
+                tool_name="read_customer",
+                arguments={"customer_id": "123"},
+            ),
+            tool_registry={"read_customer": read_customer},
+            dry_run=True,
+        )
+    )
+
+    assert isinstance(result, DryRunResult)
+    assert result.would_allow is True
+    assert result.would_block is False
+    assert result.would_require_approval is False
+    assert executed["called"] is False
+    assert [event.event_type for event in interceptor.audit_logger.events()] == ["tool_allowed"]
+
+
+def test_dry_run_returns_approval_requirement_and_emits_event() -> None:
+    interceptor = make_interceptor()
+
+    result = interceptor.intercept(
+        InterceptionRequest(
+            context=RuntimeContext(
+                agent_name="ops_agent",
+                tool_name="restart_service",
+                arguments={"service": "orders"},
+            ),
+            tool_registry={"restart_service": lambda service: {"service": service}},
+            dry_run=True,
+        )
+    )
+
+    assert isinstance(result, DryRunResult)
+    assert result.would_allow is False
+    assert result.would_block is False
+    assert result.would_require_approval is True
+    assert [event.event_type for event in interceptor.audit_logger.events()] == ["approval_required"]

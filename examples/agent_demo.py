@@ -162,7 +162,30 @@ async def main() -> None:
     for event in audit_logger.query_persisted_events(stage="tool", tool_name="restart_service"):
         print({"event_type": event.event_type, "stage": event.stage, "tool_name": event.tool_name})
 
-    print("\n7) Capability gate example")
+    print("\n7) Dry-run example")
+    dry_run_result = interceptor.intercept(
+        InterceptionRequest(
+            context=RuntimeContext(
+                agent_name="ops_agent",
+                tool_name="restart_service",
+                arguments={"service": "payments-api"},
+                framework="demo",
+                allowed_capabilities=["cap_service_ops"],
+            ),
+            tool_registry=tool_registry,
+            dry_run=True,
+        )
+    )
+    print(
+        {
+            "would_allow": dry_run_result.would_allow,
+            "would_block": dry_run_result.would_block,
+            "would_require_approval": dry_run_result.would_require_approval,
+            "reason": dry_run_result.reason,
+        }
+    )
+
+    print("\n8) Capability gate example")
     try:
         interceptor.intercept(
             InterceptionRequest(

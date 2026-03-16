@@ -14,6 +14,7 @@
 - [Getting Started](#-getting-started)
 - [Real-world attack simulation](#real-world-attack-simulation)
 - [Threat model](#threat-model)
+- [Security boundaries](#security-boundaries)
 - [Included capabilities](#included-capabilities)
 - [Policy bundles](#policy-bundles)
 - [Repository layout](#repository-layout)
@@ -405,6 +406,7 @@ Webhook sinks can also optionally sign each event payload with HMAC SHA256 and i
 Sink delivery is isolated per sink, so one failing sink does not block the others.
 Sink failures are recorded in-memory by `AuditLogger` for local inspection and persisted to JSONL for cross-process inspection without interrupting delivery to healthy sinks.
 The API exposes recorded sink delivery issues through `/audit/failures`, reading persisted sink failure records with optional query parameters: `sink_type`, `event_type`, `error_type`, and `limit`.
+Requests can also run in `dry_run` mode, which evaluates capability gates, policy, approval requirements, and runtime events without executing the underlying tool.
 
 Security violations raise:
 
@@ -423,6 +425,11 @@ Run the end-to-end adversarial demo with:
 
 ```bash
 python -m examples.hack_the_agent_demo
+```
+
+### Sample output:
+
+```text
 1) Prompt guard blocks the obvious jailbreak
 {'blocked_at': 'input', 'reason': 'Matched pattern: ignore previous instructions'}
 
@@ -446,11 +453,28 @@ Example output when the interceptor blocks a malicious agent attempt:
 
 ![AISecOps Interceptor blocking agent attack](docs/hack-the-agent-demo.png)
 
+
 What it proves:
 
 - an obvious jailbreak prompt is blocked by the prompt guard before the model response can drive tool use
 - a dangerous LLM-generated tool plan is blocked by the capability gate when the agent lacks the required capability
 - the same dangerous plan still hits approval requirements when the agent has the right capability but policy marks the tool as sensitive
+
+### Explain the same decision without executing tools
+
+You can inspect the same kind of decision path through the API without allowing the tool to run:
+
+```bash
+curl -X POST http://127.0.0.1:8000/explain \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_name": "ops_agent",
+    "tool_name": "restart_service",
+    "arguments": {"service": "payments-api"}
+  }'
+```
+
+This is useful when you want to debug capability checks, policy outcomes, and approval requirements without triggering the underlying tool.
 
 ---
 
@@ -716,6 +740,12 @@ python -m pytest -q
 # run API
 uvicorn aisecops_interceptor.api.main:app --reload
 
+# quick API check
+curl http://127.0.0.1:8000/health
+
+# interactive API docs
+# open http://127.0.0.1:8000/docs
+
 # run demos
 python -m examples.agent_demo
 python -m examples.capabilities_demo
@@ -725,6 +755,52 @@ python -m examples.langgraph_style_demo
 python examples/openclaw_demo.py
 python -m examples.policy_bundle_demo
 ```
+
+## API: Execute vs Explain
+
+AISecOps Interceptor exposes two primary endpoints:
+
+### POST /execute
+- Runs the full interception flow
+- May execute the tool if allowed
+- May block or require approval
+
+### POST /explain
+- Runs the same interception logic
+- **Does NOT execute the tool**
+- Returns a structured decision trace
+
+Example:
+
+```bash
+curl -X POST http://127.0.0.1:8000/explain \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_name": "ops_agent",
+    "tool_name": "restart_service",
+    "arguments": {"service": "payments-api"}
+  }'
+```
+
+Example response:
+
+```json
+{
+  "decision": "require_approval",
+  "capability_result": "allowed",
+  "policy_result": "require_approval",
+  "final_decision": "require_approval",
+  "reason_chain": [
+    "Capability check passed for tool restart_service",
+    "Policy rule matched: restart_service → require_approval"
+  ]
+}
+```
+
+This endpoint is useful for:
+- debugging policy decisions
+- building UI explainability
+- validating agent behavior in CI without executing tools
 
 ## Minimal example
 
@@ -763,7 +839,7 @@ Current tests validate:
 Latest verified local run:
 
 ```
-67 passed
+74 passed
 ```
 
 ---

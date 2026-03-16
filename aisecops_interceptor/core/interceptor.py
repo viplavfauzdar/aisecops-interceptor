@@ -9,7 +9,7 @@ from aisecops_interceptor.core.capability_registry import CapabilityRegistry
 from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.events import RuntimeEvent
 from aisecops_interceptor.core.exceptions import ApprovalRequiredError, PolicyViolationError, ToolNotFoundError
-from aisecops_interceptor.core.models import DecisionTrace, InterceptionRequest, ToolCall
+from aisecops_interceptor.core.models import DecisionTrace, DryRunResult, InterceptionRequest, ToolCall
 from aisecops_interceptor.core.policy import PolicyEngine
 from aisecops_interceptor.core.decision import DecisionResult, DecisionType
 from aisecops_interceptor.core.execution import ExecutionGate
@@ -47,6 +47,13 @@ class AgentInterceptor:
                     approval_id=request.approval_id,
                 )
             )
+            if request.dry_run:
+                return DryRunResult(
+                    would_allow=False,
+                    would_block=True,
+                    would_require_approval=False,
+                    reason=trace.capability_reason or "Capability gate blocked the request",
+                )
             raise PolicyViolationError(trace.capability_reason or "Capability gate blocked the request")
 
         decision = trace.policy_decision
@@ -72,6 +79,13 @@ class AgentInterceptor:
                     approval_id=approval_request.approval_id,
                 )
             )
+            if request.dry_run:
+                return DryRunResult(
+                    would_allow=False,
+                    would_block=False,
+                    would_require_approval=True,
+                    reason=decision.reason,
+                )
             raise ApprovalRequiredError(decision.reason, approval_id=approval_request.approval_id)
 
         approved = self.approval_store.is_approved(request.approval_id)
@@ -89,7 +103,22 @@ class AgentInterceptor:
         )
 
         if not decision.allowed and not (decision.requires_approval and approved):
+            if request.dry_run:
+                return DryRunResult(
+                    would_allow=False,
+                    would_block=True,
+                    would_require_approval=False,
+                    reason=decision.reason,
+                )
             raise PolicyViolationError(decision.reason)
+
+        if request.dry_run:
+            return DryRunResult(
+                would_allow=True,
+                would_block=False,
+                would_require_approval=False,
+                reason=(f"{decision.reason} (approved)" if approved and decision.requires_approval else decision.reason),
+            )
 
         tool = request.tool_registry.get(context.tool_name)
         if tool is None:
@@ -191,6 +220,7 @@ class AgentInterceptor:
         tool_call: ToolCall,
         tool_registry: dict[str, Callable[..., Any]],
         approval_id: str | None = None,
+        dry_run: bool = False,
     ) -> Any:
         context = RuntimeContext(
             agent_name=agent_name,
@@ -203,5 +233,6 @@ class AgentInterceptor:
                 context=context,
                 tool_registry=tool_registry,
                 approval_id=approval_id,
+                dry_run=dry_run,
             )
         )

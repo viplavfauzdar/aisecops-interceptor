@@ -214,6 +214,55 @@ def test_explain_endpoint_includes_reason_chain() -> None:
     assert any("globally blocked" in item for item in payload["reason_chain"])
 
 
+def test_execute_endpoint_dry_run_does_not_execute_tool() -> None:
+    executed = {"called": False}
+
+    def sentinel_read_customer(customer_id: str) -> dict[str, str]:
+        executed["called"] = True
+        return {"customer_id": customer_id}
+
+    previous_tool = tool_registry["read_customer"]
+    tool_registry["read_customer"] = sentinel_read_customer
+    try:
+        response = client.post(
+            "/execute",
+            json={
+                "agent_name": "sales_agent",
+                "tool_name": "read_customer",
+                "arguments": {"customer_id": "123"},
+                "dry_run": True,
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["status"] == "dry_run"
+        assert payload["result"]["would_allow"] is True
+        assert payload["result"]["would_block"] is False
+        assert payload["result"]["would_require_approval"] is False
+        assert executed["called"] is False
+    finally:
+        tool_registry["read_customer"] = previous_tool
+
+
+def test_execute_endpoint_dry_run_returns_approval_decision() -> None:
+    response = client.post(
+        "/execute",
+        json={
+            "agent_name": "ops_agent",
+            "tool_name": "restart_service",
+            "arguments": {"service": "orders"},
+            "dry_run": True,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "dry_run"
+    assert payload["result"]["would_allow"] is False
+    assert payload["result"]["would_block"] is False
+    assert payload["result"]["would_require_approval"] is True
+
+
 def test_audit_failures_endpoint_returns_recorded_sink_failures() -> None:
     original_failures, original_persisted = _capture_sink_failure_state()
     _set_sink_failures(

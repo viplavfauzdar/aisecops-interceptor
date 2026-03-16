@@ -18,6 +18,7 @@ class InterceptionRequest:
     context: RuntimeContext
     tool_registry: dict[str, Callable[..., Any]]
     approval_id: str | None = None
+    dry_run: bool = False
 
 
 @dataclass(slots=True)
@@ -39,6 +40,14 @@ class DecisionTrace:
     capability_reason: str | None = None
     policy_reason: str | None = None
     policy_decision: PolicyDecision | None = None
+
+
+@dataclass(slots=True)
+class DryRunResult:
+    would_allow: bool
+    would_block: bool
+    would_require_approval: bool
+    reason: str
 
 
 @dataclass(slots=True)

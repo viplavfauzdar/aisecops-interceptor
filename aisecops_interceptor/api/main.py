@@ -62,6 +62,7 @@ class ExecuteRequest(BaseModel):
     tool_name: str = Field(..., examples=["read_customer"])
     arguments: dict = Field(default_factory=dict)
     approval_id: str | None = None
+    dry_run: bool = False
 
 
 class ApprovalReviewRequest(BaseModel):
@@ -94,8 +95,9 @@ def execute(request: ExecuteRequest) -> dict:
             tool_call=ToolCall(name=request.tool_name, arguments=request.arguments),
             tool_registry=tool_registry,
             approval_id=request.approval_id,
+            dry_run=request.dry_run,
         )
-        return {"status": "allowed", "result": result}
+        return {"status": "dry_run" if request.dry_run else "allowed", "result": result}
     except ApprovalRequiredError as exc:
         raise HTTPException(status_code=202, detail={"message": str(exc), "approval_id": exc.approval_id}) from exc
     except PolicyViolationError as exc:
@@ -111,6 +113,7 @@ def explain(request: ExecuteRequest) -> dict:
             context=interceptor_context_from_request(request),
             tool_registry=tool_registry,
             approval_id=request.approval_id,
+            dry_run=request.dry_run,
         )
     )
     return {
