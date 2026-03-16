@@ -423,6 +423,23 @@ Run the end-to-end adversarial demo with:
 
 ```bash
 python -m examples.hack_the_agent_demo
+1) Prompt guard blocks the obvious jailbreak
+{'blocked_at': 'input', 'reason': 'Matched pattern: ignore previous instructions'}
+
+2) Capability gate blocks a dangerous tool plan
+{'blocked_by': 'capability_gate', 'reason': "Tool 'restart_service' requires one of the granted capabilities: cap_service_ops", 'plan': 'TOOL restart_service service=payments-api'}
+
+3) Policy still requires approval for privileged use
+{'approval_required': True, 'reason': "Rule requires approval for tool 'restart_service'", 'plan': 'TOOL restart_service service=payments-api'}
+
+4) Runtime event trail
+{'event_type': 'prompt_blocked', 'stage': 'input', 'decision': 'blocked', 'tool_name': None, 'reason': 'Matched pattern: ignore previous instructions'}
+{'event_type': 'prompt_allowed', 'stage': 'input', 'decision': 'allowed', 'tool_name': None, 'reason': 'Prompt allowed'}
+{'event_type': 'output_allowed', 'stage': 'output', 'decision': 'allowed', 'tool_name': None, 'reason': 'Output allowed'}
+{'event_type': 'tool_blocked', 'stage': 'tool', 'decision': 'blocked', 'tool_name': 'restart_service', 'reason': "Tool 'restart_service' requires one of the granted capabilities: cap_service_ops"}
+{'event_type': 'prompt_allowed', 'stage': 'input', 'decision': 'allowed', 'tool_name': None, 'reason': 'Prompt allowed'}
+{'event_type': 'output_allowed', 'stage': 'output', 'decision': 'allowed', 'tool_name': None, 'reason': 'Output allowed'}
+{'event_type': 'approval_required', 'stage': 'tool', 'decision': 'require_approval', 'tool_name': 'restart_service', 'reason': "Rule requires approval for tool 'restart_service'"}
 ```
 
 Example output when the interceptor blocks a malicious agent attempt:
