@@ -2,7 +2,7 @@ import json
 
 from fastapi.testclient import TestClient
 
-from aisecops_interceptor.api.main import app, audit
+from aisecops_interceptor.api.main import app, audit, tool_registry
 from aisecops_interceptor.core.audit import SinkFailure
 
 
@@ -153,6 +153,65 @@ def test_audit_endpoint_applies_limit() -> None:
     audit_response = client.get("/audit", params={"limit": 1})
     assert audit_response.status_code == 200
     assert len(audit_response.json()) == 1
+
+
+def test_explain_endpoint_returns_structured_decision() -> None:
+    response = client.post(
+        "/explain",
+        json={
+            "agent_name": "ops_agent",
+            "tool_name": "restart_service",
+            "arguments": {"service": "orders"},
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["decision"] == "require_approval"
+    assert payload["capability_result"] == "not_applicable"
+    assert payload["policy_result"] == "require_approval"
+    assert payload["final_decision"] == "require_approval"
+
+
+def test_explain_endpoint_does_not_execute_tool() -> None:
+    executed = {"called": False}
+
+    def sentinel_read_customer(customer_id: str) -> dict[str, str]:
+        executed["called"] = True
+        return {"customer_id": customer_id}
+
+    previous_tool = tool_registry["read_customer"]
+    tool_registry["read_customer"] = sentinel_read_customer
+    try:
+        response = client.post(
+            "/explain",
+            json={
+                "agent_name": "sales_agent",
+                "tool_name": "read_customer",
+                "arguments": {"customer_id": "123"},
+            },
+        )
+        assert response.status_code == 200
+        assert executed["called"] is False
+    finally:
+        tool_registry["read_customer"] = previous_tool
+
+
+def test_explain_endpoint_includes_reason_chain() -> None:
+    response = client.post(
+        "/explain",
+        json={
+            "agent_name": "sales_agent",
+            "tool_name": "delete_database",
+            "arguments": {"name": "prod"},
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["final_decision"] == "blocked"
+    assert any("Capability gate skipped" in item or "globally blocked" in item for item in payload["reason_chain"])
+    assert any("globally blocked" in item for item in payload["reason_chain"])
 
 
 def test_audit_failures_endpoint_returns_recorded_sink_failures() -> None:

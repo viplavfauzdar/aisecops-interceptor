@@ -30,6 +30,18 @@ class PolicyDecision:
 
 
 @dataclass(slots=True)
+class DecisionTrace:
+    decision: str
+    reason_chain: list[str]
+    capability_result: str
+    policy_result: str
+    final_decision: str
+    capability_reason: str | None = None
+    policy_reason: str | None = None
+    policy_decision: PolicyDecision | None = None
+
+
+@dataclass(slots=True)
 class ApprovalRequest:
     approval_id: str
     agent_name: str

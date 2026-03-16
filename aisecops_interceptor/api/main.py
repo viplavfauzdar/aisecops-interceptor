@@ -8,9 +8,10 @@ from fastapi.responses import RedirectResponse
 
 from aisecops_interceptor.core.approval import ApprovalStore
 from aisecops_interceptor.core.audit import AuditLogger
+from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.exceptions import ApprovalRequiredError, PolicyViolationError, ToolNotFoundError
 from aisecops_interceptor.core.interceptor import AgentInterceptor
-from aisecops_interceptor.core.models import ToolCall
+from aisecops_interceptor.core.models import InterceptionRequest, ToolCall
 from aisecops_interceptor.core.policy import PolicyEngine
 from aisecops_interceptor.integrations.openclaw_adapter import OpenClawToolRunnerAdapter
 
@@ -80,6 +81,7 @@ class OpenClawExecuteRequest(BaseModel):
 def root() -> RedirectResponse:
     return RedirectResponse(url="/docs")
 
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -100,6 +102,24 @@ def execute(request: ExecuteRequest) -> dict:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ToolNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/explain")
+def explain(request: ExecuteRequest) -> dict:
+    trace = interceptor.explain(
+        InterceptionRequest(
+            context=interceptor_context_from_request(request),
+            tool_registry=tool_registry,
+            approval_id=request.approval_id,
+        )
+    )
+    return {
+        "decision": trace.decision,
+        "reason_chain": trace.reason_chain,
+        "capability_result": trace.capability_result,
+        "policy_result": trace.policy_result,
+        "final_decision": trace.final_decision,
+    }
 
 
 @app.post("/approvals/{approval_id}/approve")
@@ -137,6 +157,15 @@ def execute_openclaw(request: OpenClawExecuteRequest) -> dict:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ToolNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+def interceptor_context_from_request(request: ExecuteRequest) -> RuntimeContext:
+    return RuntimeContext(
+        agent_name=request.agent_name,
+        tool_name=request.tool_name,
+        arguments=request.arguments,
+        framework="legacy",
+    )
 
 
 @app.get("/audit")
