@@ -1,9 +1,13 @@
 capabilities:
   cap_service_ops:
+    description: Manage service lifecycle operations
+    risk: high
     tools:
       - restart_service
       - stop_service
 
   cap_customer_read:
+    description: Read customer account records
+    risk: medium
     tools:
       - read_customer

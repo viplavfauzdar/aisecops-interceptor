@@ -33,6 +33,13 @@ class PolicyDecision:
 
 
 @dataclass(slots=True)
+class CapabilityDefinition:
+    tools: tuple[str, ...]
+    description: str | None = None
+    risk: str | None = None
+
+
+@dataclass(slots=True)
 class DecisionTrace:
     decision: str
     reason_chain: list[str]
@@ -40,6 +47,7 @@ class DecisionTrace:
     policy_result: str
     final_decision: str
     capability_reason: str | None = None
+    capability_metadata: dict[str, CapabilityDefinition] | None = None
     policy_reason: str | None = None
     policy_decision: PolicyDecision | None = None
 
@@ -94,6 +102,7 @@ class ExplainResponse(BaseModel):
     capability_result: str
     policy_result: str
     final_decision: str
+    capability_metadata: dict[str, dict[str, Any]] | None = None
 
 
 @dataclass(slots=True)

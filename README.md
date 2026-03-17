@@ -475,6 +475,7 @@ curl -X POST http://127.0.0.1:8000/explain \
 ```
 
 This is useful when you want to debug capability checks, policy outcomes, and approval requirements without triggering the underlying tool.
+When the requested tool is covered by a capability mapping, the explain trace can also include optional capability metadata such as `description` and `risk`.
 
 ---
 
@@ -523,14 +524,20 @@ Capability mappings can be defined declaratively in YAML, for example in `polici
 ```yaml
 capabilities:
   cap_service_ops:
+    description: Manage service lifecycle operations
+    risk: high
     tools:
       - restart_service
       - stop_service
 
   cap_customer_read:
+    description: Read customer account records
+    risk: medium
     tools:
       - read_customer
 ```
+
+`description` and `risk` are optional metadata fields. They load with the capability definition and can be surfaced in explainability flows, but they do not change capability-gate decisions by themselves.
 
 If an agent receives `allowed_capabilities=["cap_service_ops"]`, it can request `restart_service`. If the capability list is omitted, current behavior remains unchanged and the interceptor falls back to the existing policy flow. Direct Python mappings still work, but YAML-backed loading is the preferred path.
 
@@ -842,7 +849,7 @@ Current tests validate:
 Latest verified local run:
 
 ```
-81/81 passed
+84/84 passed
 ```
 
 ---

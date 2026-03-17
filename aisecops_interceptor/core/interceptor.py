@@ -156,6 +156,11 @@ class AgentInterceptor:
         context = request.context
         tool_call = context.to_tool_call()
         reason_chain: list[str] = []
+        capability_metadata = (
+            self.capability_registry.metadata_for_tool(context.tool_name)
+            if context.tool_name is not None
+            else None
+        ) or None
 
         capability_reason = self._capability_denial_reason(context)
         if capability_reason is not None:
@@ -167,6 +172,7 @@ class AgentInterceptor:
                 policy_result="not_evaluated",
                 final_decision="blocked",
                 capability_reason=capability_reason,
+                capability_metadata=capability_metadata,
             )
 
         capability_result = "not_applicable" if context.allowed_capabilities is None else "allowed"
@@ -186,6 +192,7 @@ class AgentInterceptor:
             capability_result=capability_result,
             policy_result=policy_result,
             final_decision=policy_result,
+            capability_metadata=capability_metadata,
             policy_reason=decision.reason,
             policy_decision=decision,
         )

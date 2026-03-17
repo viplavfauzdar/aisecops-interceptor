@@ -200,6 +200,13 @@ EXPLAIN_RESPONSES = {
                             "capability_result": "not_applicable",
                             "policy_result": "require_approval",
                             "final_decision": "require_approval",
+                            "capability_metadata": {
+                                "cap_service_ops": {
+                                    "tools": ["restart_service", "stop_service"],
+                                    "description": "Manage service lifecycle operations",
+                                    "risk": "high",
+                                }
+                            },
                         },
                     },
                     "blocked": {
@@ -350,6 +357,14 @@ def explain(request: ExecuteRequest = Body(..., openapi_examples=EXECUTE_REQUEST
         capability_result=trace.capability_result,
         policy_result=trace.policy_result,
         final_decision=trace.final_decision,
+        capability_metadata=(
+            {
+                capability: asdict(definition)
+                for capability, definition in trace.capability_metadata.items()
+            }
+            if trace.capability_metadata is not None
+            else None
+        ),
     ).model_dump()
 
 

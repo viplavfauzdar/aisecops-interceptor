@@ -1,4 +1,5 @@
 from aisecops_interceptor.core.capability_registry import CapabilityRegistry
+from aisecops_interceptor.core.models import CapabilityDefinition
 from aisecops_interceptor.policy.loader import PolicyLoader
 from aisecops_interceptor.policy.schema import CapabilityBundleValidationError
 
@@ -23,8 +24,16 @@ def test_loads_valid_capability_yaml(tmp_path) -> None:
 
     bundle = PolicyLoader.from_capabilities_yaml(str(capability_path))
     assert bundle.capabilities == {
-        "cap_service_ops": ("restart_service", "stop_service"),
-        "cap_customer_read": ("read_customer",),
+        "cap_service_ops": CapabilityDefinition(
+            tools=("restart_service", "stop_service"),
+            description=None,
+            risk=None,
+        ),
+        "cap_customer_read": CapabilityDefinition(
+            tools=("read_customer",),
+            description=None,
+            risk=None,
+        ),
     }
 
 
