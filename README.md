@@ -14,6 +14,7 @@
 - [Getting Started](#-getting-started)
 - [Real-world attack simulation](#real-world-attack-simulation)
 - [Threat model](#threat-model)
+- [Security boundaries](#security-boundaries)
 - [Included capabilities](#included-capabilities)
 - [Policy bundles](#policy-bundles)
 - [Repository layout](#repository-layout)
@@ -405,6 +406,7 @@ Webhook sinks can also optionally sign each event payload with HMAC SHA256 and i
 Sink delivery is isolated per sink, so one failing sink does not block the others.
 Sink failures are recorded in-memory by `AuditLogger` for local inspection and persisted to JSONL for cross-process inspection without interrupting delivery to healthy sinks.
 The API exposes recorded sink delivery issues through `/audit/failures`, reading persisted sink failure records with optional query parameters: `sink_type`, `event_type`, `error_type`, and `limit`.
+Requests can also run in `dry_run` mode, which evaluates capability gates, policy, approval requirements, and runtime events without executing the underlying tool.
 
 Security violations raise:
 
@@ -423,6 +425,11 @@ Run the end-to-end adversarial demo with:
 
 ```bash
 python -m examples.hack_the_agent_demo
+```
+
+### Sample output:
+
+```text
 1) Prompt guard blocks the obvious jailbreak
 {'blocked_at': 'input', 'reason': 'Matched pattern: ignore previous instructions'}
 
@@ -446,11 +453,29 @@ Example output when the interceptor blocks a malicious agent attempt:
 
 ![AISecOps Interceptor blocking agent attack](docs/hack-the-agent-demo.png)
 
+
 What it proves:
 
 - an obvious jailbreak prompt is blocked by the prompt guard before the model response can drive tool use
 - a dangerous LLM-generated tool plan is blocked by the capability gate when the agent lacks the required capability
 - the same dangerous plan still hits approval requirements when the agent has the right capability but policy marks the tool as sensitive
+
+### Explain the same decision without executing tools
+
+You can inspect the same kind of decision path through the API without allowing the tool to run:
+
+```bash
+curl -X POST http://127.0.0.1:8000/explain \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_name": "ops_agent",
+    "tool_name": "restart_service",
+    "arguments": {"service": "payments-api"}
+  }'
+```
+
+This is useful when you want to debug capability checks, policy outcomes, and approval requirements without triggering the underlying tool.
+When the requested tool is covered by a capability mapping, the explain trace can also include optional capability metadata such as `description` and `risk`.
 
 ---
 
@@ -483,6 +508,12 @@ create_llm_client(LLMConfig)
 
 `PolicyEngine` can evaluate an ordered set of declarative rules before falling back to the existing config-driven checks.
 When `RuntimeContext.allowed_capabilities` is provided, a capability gate runs before policy evaluation. That gate maps granted capabilities to tool names and blocks any tool request that is not explicitly granted.
+The policy layer also includes a built-in high-risk tool preset. By default, tools such as `restart_service`, `shell_exec`, `delete_user`, and `export_data` require approval unless an explicit policy rule overrides that outcome.
+
+Configuration responsibilities are separated deliberately:
+
+- `policies/capabilities.yaml` contains only capability-to-tool mappings and optional capability metadata
+- `policies/policies.yaml` contains only policy behavior such as blocked tools, monitored tools, dangerous patterns, high-risk tools, and per-agent policy settings
 
 Each rule supports:
 
@@ -498,16 +529,46 @@ Capability mappings can be defined declaratively in YAML, for example in `polici
 ```yaml
 capabilities:
   cap_service_ops:
+    description: Manage service lifecycle operations
+    risk: high
     tools:
       - restart_service
       - stop_service
 
   cap_customer_read:
+    description: Read customer account records
+    risk: medium
     tools:
       - read_customer
 ```
 
+`description` and `risk` are optional metadata fields. They load with the capability definition and can be surfaced in explainability flows, but they do not change capability-gate decisions by themselves.
+
 If an agent receives `allowed_capabilities=["cap_service_ops"]`, it can request `restart_service`. If the capability list is omitted, current behavior remains unchanged and the interceptor falls back to the existing policy flow. Direct Python mappings still work, but YAML-backed loading is the preferred path.
+
+Policy behavior belongs in `policies/policies.yaml`, for example:
+
+```yaml
+blocked_tools:
+  - delete_database
+  - shell_exec
+
+monitored_tools:
+  - send_email
+  - create_incident
+
+high_risk_tools:
+  - restart_service
+
+agents:
+  ops_agent:
+    allowed_tools:
+      - get_deployment_status
+      - create_incident
+      - restart_service
+    approval_required_tools:
+      - restart_service
+```
 
 Example:
 
@@ -557,6 +618,7 @@ policy = PolicyEngine.from_yaml()
 ```
 
 YAML bundles are validated before rules are constructed, and invalid bundles raise a validation error.
+YAML policy bundles can extend the built-in high-risk preset with `high_risk_tools`, or replace it entirely with `high_risk_tools_mode: override`.
 
 ---
 
@@ -716,6 +778,13 @@ python -m pytest -q
 # run API
 uvicorn aisecops_interceptor.api.main:app --reload
 
+# quick API check
+curl http://127.0.0.1:8000/health
+
+# interactive API docs
+# open http://127.0.0.1:8000/docs
+# the Swagger docs include ready-to-run structured success and error examples for /execute and /explain
+
 # run demos
 python -m examples.agent_demo
 python -m examples.capabilities_demo
@@ -726,12 +795,87 @@ python examples/openclaw_demo.py
 python -m examples.policy_bundle_demo
 ```
 
+## API: Execute vs Explain
+
+AISecOps Interceptor exposes two primary endpoints:
+
+### POST /execute
+- Runs the full interception flow
+- May execute the tool if allowed
+- May block or require approval
+
+### POST /explain
+- Runs the same interception logic
+- **Does NOT execute the tool**
+- Returns a structured decision trace
+
+Both endpoints now use a consistent response envelope:
+- `status`: `success`, `blocked`, `require_approval`, or `dry_run`
+- `decision`: `allow`, `block`, or `require_approval`
+- `reason`: primary human-readable outcome
+- `data`: optional execution or approval payload
+- `trace`: optional structured decision trace
+
+Example:
+
+```bash
+curl -X POST http://127.0.0.1:8000/explain \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_name": "ops_agent",
+    "tool_name": "restart_service",
+    "arguments": {"service": "payments-api"}
+  }'
+```
+
+Example response:
+
+```json
+{
+  "status": "require_approval",
+  "decision": "require_approval",
+  "reason": "Tool 'restart_service' requires human approval",
+  "data": null,
+  "trace": {
+    "capability_result": "not_applicable",
+    "policy_result": "require_approval",
+    "final_decision": "require_approval",
+    "reason_chain": [
+      "Capability gate skipped because no capabilities were provided",
+      "Capability cap_service_ops (risk: high) governs access to restart_service",
+      "Tool 'restart_service' requires human approval"
+    ],
+    "capability_metadata": {
+      "cap_service_ops": {
+        "tools": ["restart_service", "stop_service"],
+        "description": "Manage service lifecycle operations",
+        "risk": "high"
+      }
+    }
+  }
+}
+```
+
+This endpoint is useful for:
+- debugging policy decisions
+- building UI explainability
+- validating agent behavior in CI without executing tools
+
 ## Minimal example
 
+For a working end‑to‑end example showing interception, policy evaluation, and tool execution control, run:
 For a working end‑to‑end example showing interception, policy evaluation, and tool execution control, run:
 
 ```bash
 python -m examples.agent_demo
+```
+
+Additional demos:
+
+```bash
+python -m examples.hack_the_agent_demo
+python -m examples.capabilities_demo
+python -m examples.policy_bundle_demo
 ```
 
 Additional demos:
@@ -763,7 +907,7 @@ Current tests validate:
 Latest verified local run:
 
 ```
-67 passed
+85/85 passed
 ```
 
 ---

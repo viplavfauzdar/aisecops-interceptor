@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable
 
+from pydantic import BaseModel
+
 from aisecops_interceptor.core.context import RuntimeContext
 
 
@@ -18,6 +20,7 @@ class InterceptionRequest:
     context: RuntimeContext
     tool_registry: dict[str, Callable[..., Any]]
     approval_id: str | None = None
+    dry_run: bool = False
 
 
 @dataclass(slots=True)
@@ -27,6 +30,57 @@ class PolicyDecision:
     matched_rule: str | None = None
     risk_level: str = "low"
     requires_approval: bool = False
+
+
+@dataclass(slots=True)
+class CapabilityDefinition:
+    tools: tuple[str, ...]
+    description: str | None = None
+    risk: str | None = None
+
+
+@dataclass(slots=True)
+class DecisionTrace:
+    decision: str
+    reason_chain: list[str]
+    capability_result: str
+    policy_result: str
+    final_decision: str
+    capability_reason: str | None = None
+    capability_metadata: dict[str, CapabilityDefinition] | None = None
+    policy_reason: str | None = None
+    policy_decision: PolicyDecision | None = None
+
+
+@dataclass(slots=True)
+class DryRunResult:
+    would_allow: bool
+    would_block: bool
+    would_require_approval: bool
+    reason: str
+
+
+class DryRunResultModel(BaseModel):
+    would_allow: bool
+    would_block: bool
+    would_require_approval: bool
+    reason: str
+
+
+class ExplainTraceModel(BaseModel):
+    reason_chain: list[str]
+    capability_result: str
+    policy_result: str
+    final_decision: str
+    capability_metadata: dict[str, dict[str, Any]] | None = None
+
+
+class APIResponse(BaseModel):
+    status: str
+    decision: str
+    reason: str
+    data: dict[str, Any] | None = None
+    trace: ExplainTraceModel | None = None
 
 
 @dataclass(slots=True)

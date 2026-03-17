@@ -1,3 +1,6 @@
+# Policy bundle:
+# policy behavior only: blocked tools, monitoring, dangerous patterns,
+# high-risk presets, and per-agent policy rules.
 blocked_tools:
   - delete_database
   - shell_exec
@@ -11,6 +14,9 @@ dangerous_argument_patterns:
   - api_key
   - ignore previous instructions
   - rm -rf
+
+high_risk_tools:
+  - restart_service
 
 agents:
   sales_agent:

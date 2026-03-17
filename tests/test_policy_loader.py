@@ -84,4 +84,5 @@ def test_policy_loader_defaults_to_external_bundle_path() -> None:
     bundle = PolicyLoader.from_yaml()
 
     assert "sales_agent" in bundle.config["agents"]
-    assert "delete_database" in bundle.config["blocked_tools"]
+    assert "shell_exec" in bundle.config["blocked_tools"]
+    assert "capabilities" not in bundle.config

@@ -2,7 +2,7 @@ import json
 
 from fastapi.testclient import TestClient
 
-from aisecops_interceptor.api.main import app, audit
+from aisecops_interceptor.api.main import app, audit, tool_registry
 from aisecops_interceptor.core.audit import SinkFailure
 
 
@@ -49,7 +49,12 @@ def test_execute_endpoint_allows_and_serializes_audit_event() -> None:
     )
 
     assert response.status_code == 200
-    assert response.json()["result"] == {"customer_id": "123", "status": "active"}
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert payload["decision"] == "allow"
+    assert payload["reason"] == "Allowed by policy"
+    assert payload["data"] == {"customer_id": "123", "status": "active"}
+    assert payload["trace"]["final_decision"] == "allowed"
 
     audit_response = client.get("/audit")
     assert audit_response.status_code == 200
@@ -70,7 +75,12 @@ def test_approval_flow_serializes_pending_requests() -> None:
     )
 
     assert response.status_code == 202
-    approval_id = response.json()["detail"]["approval_id"]
+    payload = response.json()
+    assert payload["status"] == "require_approval"
+    assert payload["decision"] == "require_approval"
+    assert payload["data"]["approval_id"]
+    approval_id = payload["data"]["approval_id"]
+    assert payload["trace"]["final_decision"] == "require_approval"
 
     approvals_response = client.get("/approvals")
     assert approvals_response.status_code == 200
@@ -153,6 +163,224 @@ def test_audit_endpoint_applies_limit() -> None:
     audit_response = client.get("/audit", params={"limit": 1})
     assert audit_response.status_code == 200
     assert len(audit_response.json()) == 1
+
+
+def test_explain_endpoint_returns_structured_decision() -> None:
+    response = client.post(
+        "/explain",
+        json={
+            "agent_name": "ops_agent",
+            "tool_name": "restart_service",
+            "arguments": {"service": "orders"},
+        },
+    )
+
+    assert response.status_code == 202
+    payload = response.json()
+    assert payload["status"] == "require_approval"
+    assert payload["decision"] == "require_approval"
+    assert payload["reason"] == "Tool 'restart_service' requires human approval"
+    assert payload["data"] is None
+    assert payload["trace"]["capability_result"] == "not_applicable"
+    assert payload["trace"]["policy_result"] == "require_approval"
+    assert payload["trace"]["final_decision"] == "require_approval"
+    assert any("risk: high" in item for item in payload["trace"]["reason_chain"])
+    assert any("cap_service_ops" in item for item in payload["trace"]["reason_chain"])
+
+
+def test_explain_endpoint_does_not_execute_tool() -> None:
+    executed = {"called": False}
+
+    def sentinel_read_customer(customer_id: str) -> dict[str, str]:
+        executed["called"] = True
+        return {"customer_id": customer_id}
+
+    previous_tool = tool_registry["read_customer"]
+    tool_registry["read_customer"] = sentinel_read_customer
+    try:
+        response = client.post(
+            "/explain",
+            json={
+                "agent_name": "sales_agent",
+                "tool_name": "read_customer",
+                "arguments": {"customer_id": "123"},
+            },
+        )
+        assert response.status_code == 200
+        assert executed["called"] is False
+    finally:
+        tool_registry["read_customer"] = previous_tool
+
+
+def test_explain_endpoint_includes_reason_chain() -> None:
+    response = client.post(
+        "/explain",
+        json={
+            "agent_name": "sales_agent",
+            "tool_name": "shell_exec",
+            "arguments": {"command": "rm -rf /tmp/demo"},
+        },
+    )
+
+    assert response.status_code == 403
+    payload = response.json()
+    assert payload["status"] == "blocked"
+    assert payload["decision"] == "block"
+    assert payload["trace"]["final_decision"] == "blocked"
+    assert any("Capability gate skipped" in item or "globally blocked" in item for item in payload["trace"]["reason_chain"])
+    assert any("globally blocked" in item for item in payload["trace"]["reason_chain"])
+
+
+def test_execute_endpoint_returns_structured_block_response() -> None:
+    response = client.post(
+        "/execute",
+        json={
+            "agent_name": "sales_agent",
+            "tool_name": "shell_exec",
+            "arguments": {"command": "rm -rf /tmp/demo"},
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "status": "blocked",
+        "decision": "block",
+        "reason": "Tool 'shell_exec' is globally blocked",
+        "data": None,
+        "trace": {
+            "reason_chain": [
+                "Capability gate skipped because no capabilities were provided",
+                "Tool 'shell_exec' is globally blocked",
+            ],
+            "capability_result": "not_applicable",
+            "policy_result": "blocked",
+            "final_decision": "blocked",
+            "capability_metadata": None,
+        },
+    }
+
+
+def test_explain_endpoint_returns_structured_not_found_response() -> None:
+    response = client.post(
+        "/explain",
+        json={
+            "agent_name": "sales_agent",
+            "tool_name": "missing_tool",
+            "arguments": {},
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "status": "blocked",
+        "decision": "block",
+        "reason": "Tool 'missing_tool' not found",
+        "data": None,
+        "trace": None,
+    }
+
+
+def test_execute_endpoint_dry_run_does_not_execute_tool() -> None:
+    executed = {"called": False}
+
+    def sentinel_read_customer(customer_id: str) -> dict[str, str]:
+        executed["called"] = True
+        return {"customer_id": customer_id}
+
+    previous_tool = tool_registry["read_customer"]
+    tool_registry["read_customer"] = sentinel_read_customer
+    try:
+        response = client.post(
+            "/execute",
+            json={
+                "agent_name": "sales_agent",
+                "tool_name": "read_customer",
+                "arguments": {"customer_id": "123"},
+                "dry_run": True,
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["status"] == "dry_run"
+        assert payload["decision"] == "allow"
+        assert payload["data"]["would_allow"] is True
+        assert payload["data"]["would_block"] is False
+        assert payload["data"]["would_require_approval"] is False
+        assert payload["trace"]["final_decision"] == "allowed"
+        assert executed["called"] is False
+    finally:
+        tool_registry["read_customer"] = previous_tool
+
+
+def test_execute_endpoint_dry_run_returns_approval_decision() -> None:
+    response = client.post(
+        "/execute",
+        json={
+            "agent_name": "ops_agent",
+            "tool_name": "restart_service",
+            "arguments": {"service": "orders"},
+            "dry_run": True,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "dry_run"
+    assert payload["decision"] == "require_approval"
+    assert payload["data"]["would_allow"] is False
+    assert payload["data"]["would_block"] is False
+    assert payload["data"]["would_require_approval"] is True
+    assert payload["trace"]["final_decision"] == "require_approval"
+
+
+def test_openapi_includes_execute_and_explain_examples() -> None:
+    response = client.get("/openapi.json")
+    assert response.status_code == 200
+    schema = response.json()
+
+    execute_operation = schema["paths"]["/execute"]["post"]
+    explain_operation = schema["paths"]["/explain"]["post"]
+
+    execute_examples = execute_operation["requestBody"]["content"]["application/json"]["examples"]
+    assert "safe_tool_execution" in execute_examples
+    assert "approval_required_tool" in execute_examples
+    assert "dry_run_request" in execute_examples
+
+    execute_response_examples = execute_operation["responses"]["200"]["content"]["application/json"]["examples"]
+    assert "allowed_execution" in execute_response_examples
+    assert "dry_run_result" in execute_response_examples
+
+    approval_response = execute_operation["responses"]["202"]["content"]["application/json"]["example"]
+    assert approval_response["status"] == "require_approval"
+    assert approval_response["decision"] == "require_approval"
+    assert "data" in approval_response
+
+    blocked_response = execute_operation["responses"]["403"]["content"]["application/json"]["examples"]["policy_block"][
+        "value"
+    ]
+    assert blocked_response["status"] == "blocked"
+    assert blocked_response["decision"] == "block"
+
+    not_found_response = execute_operation["responses"]["404"]["content"]["application/json"]["example"]
+    assert not_found_response["status"] == "blocked"
+    assert not_found_response["decision"] == "block"
+
+    explain_success = explain_operation["responses"]["200"]["content"]["application/json"]["examples"]["allowed"]["value"]
+    assert explain_success["status"] == "success"
+    assert explain_success["decision"] == "allow"
+    assert explain_success["trace"]["final_decision"] == "allowed"
+
+    explain_approval = explain_operation["responses"]["202"]["content"]["application/json"]["example"]
+    assert explain_approval["status"] == "require_approval"
+    assert explain_approval["trace"]["final_decision"] == "require_approval"
+
+    explain_blocked = explain_operation["responses"]["403"]["content"]["application/json"]["examples"]["blocked"]["value"]
+    assert explain_blocked["status"] == "blocked"
+    assert explain_blocked["decision"] == "block"
+    assert explain_blocked["trace"]["final_decision"] == "blocked"
+
+    explain_not_found = explain_operation["responses"]["404"]["content"]["application/json"]["example"]
+    assert explain_not_found["status"] == "blocked"
 
 
 def test_audit_failures_endpoint_returns_recorded_sink_failures() -> None:

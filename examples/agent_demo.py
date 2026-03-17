@@ -53,6 +53,10 @@ def restart_service(service: str) -> dict[str, str]:
     return {"service": service, "status": "restarted"}
 
 
+def export_data(scope: str) -> dict[str, str]:
+    return {"scope": scope, "status": "exported"}
+
+
 async def main() -> None:
     audit_path = Path("audit/agent-demo-runtime-events.jsonl")
     audit_path.parent.mkdir(parents=True, exist_ok=True)
@@ -60,17 +64,7 @@ async def main() -> None:
         audit_path.unlink()
     audit_logger = AuditLogger(log_path=str(audit_path))
     approval_store = DemoApprovalStore()
-    policy_engine = PolicyEngine(
-        {
-            "rules": [
-                {
-                    "tool_name": "restart_service",
-                    "agent_name": "ops_agent",
-                    "action": "require_approval",
-                }
-            ]
-        }
-    )
+    policy_engine = PolicyEngine.from_yaml("policies/policies.yaml")
     interceptor = AgentInterceptor(
         policy_engine=policy_engine,
         audit_logger=audit_logger,
@@ -162,7 +156,30 @@ async def main() -> None:
     for event in audit_logger.query_persisted_events(stage="tool", tool_name="restart_service"):
         print({"event_type": event.event_type, "stage": event.stage, "tool_name": event.tool_name})
 
-    print("\n7) Capability gate example")
+    print("\n7) Dry-run example")
+    dry_run_result = interceptor.intercept(
+        InterceptionRequest(
+            context=RuntimeContext(
+                agent_name="ops_agent",
+                tool_name="restart_service",
+                arguments={"service": "payments-api"},
+                framework="demo",
+                allowed_capabilities=["cap_service_ops"],
+            ),
+            tool_registry=tool_registry,
+            dry_run=True,
+        )
+    )
+    print(
+        {
+            "would_allow": dry_run_result.would_allow,
+            "would_block": dry_run_result.would_block,
+            "would_require_approval": dry_run_result.would_require_approval,
+            "reason": dry_run_result.reason,
+        }
+    )
+
+    print("\n8) Capability gate example")
     try:
         interceptor.intercept(
             InterceptionRequest(
@@ -178,6 +195,35 @@ async def main() -> None:
         )
     except PolicyViolationError as exc:
         print({"capability_blocked": True, "reason": str(exc)})
+
+    print("\n9) Default high-risk preset example")
+    high_risk_interceptor = AgentInterceptor(
+        policy_engine=PolicyEngine(
+            {
+                "agents": {
+                    "ops_agent": {
+                        "allowed_tools": ["export_data"],
+                    },
+                },
+            }
+        ),
+        audit_logger=AuditLogger(),
+        approval_store=DemoApprovalStore(),
+    )
+    try:
+        high_risk_interceptor.intercept(
+            InterceptionRequest(
+                context=RuntimeContext(
+                    agent_name="ops_agent",
+                    tool_name="export_data",
+                    arguments={"scope": "customers"},
+                    framework="demo",
+                ),
+                tool_registry={"export_data": export_data},
+            )
+        )
+    except ApprovalRequiredError as exc:
+        print({"preset_requires_approval": True, "reason": str(exc)})
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from aisecops_interceptor.core.models import CapabilityDefinition
 from aisecops_interceptor.policy.rules import Rule
 
 
@@ -22,7 +23,7 @@ class PolicyBundle:
 
 @dataclass(slots=True)
 class CapabilityBundle:
-    capabilities: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    capabilities: dict[str, CapabilityDefinition] = field(default_factory=dict)
 
 
 def parse_policy_bundle(data: Any) -> PolicyBundle:
@@ -76,7 +77,7 @@ def parse_capability_bundle(data: Any) -> CapabilityBundle:
     if not isinstance(raw_capabilities, dict):
         raise CapabilityBundleValidationError("'capabilities' must be a mapping")
 
-    capabilities: dict[str, tuple[str, ...]] = {}
+    capabilities: dict[str, CapabilityDefinition] = {}
     for capability_name, definition in raw_capabilities.items():
         if str(capability_name).strip() == "":
             raise CapabilityBundleValidationError("Capability names must be non-empty strings")
@@ -99,6 +100,29 @@ def parse_capability_bundle(data: Any) -> CapabilityBundle:
                 )
             tools.append(str(tool_name))
 
-        capabilities[str(capability_name)] = tuple(tools)
+        description = definition.get("description")
+        if description is not None and not isinstance(description, str):
+            raise CapabilityBundleValidationError(
+                f"Capability '{capability_name}' field 'description' must be a string"
+            )
+
+        risk = definition.get("risk")
+        if risk is not None:
+            if not isinstance(risk, str):
+                raise CapabilityBundleValidationError(
+                    f"Capability '{capability_name}' field 'risk' must be a string"
+                )
+            normalized_risk = risk.lower()
+            if normalized_risk not in {"low", "medium", "high"}:
+                raise CapabilityBundleValidationError(
+                    f"Capability '{capability_name}' field 'risk' must be one of: low, medium, high"
+                )
+            risk = normalized_risk
+
+        capabilities[str(capability_name)] = CapabilityDefinition(
+            tools=tuple(tools),
+            description=description,
+            risk=risk,
+        )
 
     return CapabilityBundle(capabilities=capabilities)
