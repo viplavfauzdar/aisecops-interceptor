@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from fastapi.responses import RedirectResponse
 
@@ -56,6 +56,105 @@ tool_registry = {
     "shell_exec": shell_exec,
 }
 
+EXECUTE_REQUEST_EXAMPLES = {
+    "safe_tool_execution": {
+        "summary": "Safe tool execution",
+        "description": "A normal allowed request that executes immediately.",
+        "value": {
+            "agent_name": "sales_agent",
+            "tool_name": "read_customer",
+            "arguments": {"customer_id": "123"},
+            "dry_run": False,
+        },
+    },
+    "approval_required_tool": {
+        "summary": "Approval-required tool",
+        "description": "A high-risk or policy-gated tool that requires approval.",
+        "value": {
+            "agent_name": "ops_agent",
+            "tool_name": "restart_service",
+            "arguments": {"service": "orders"},
+            "dry_run": False,
+        },
+    },
+    "dry_run_request": {
+        "summary": "Dry-run request",
+        "description": "Evaluate the request without executing the tool.",
+        "value": {
+            "agent_name": "ops_agent",
+            "tool_name": "restart_service",
+            "arguments": {"service": "orders"},
+            "dry_run": True,
+        },
+    },
+}
+
+EXECUTE_RESPONSES = {
+    200: {
+        "description": "Allowed execution or dry-run decision",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "allowed_execution": {
+                        "summary": "Allowed execution",
+                        "value": {
+                            "status": "allowed",
+                            "result": {"customer_id": "123", "status": "active"},
+                        },
+                    },
+                    "dry_run_result": {
+                        "summary": "Dry-run result",
+                        "value": {
+                            "status": "dry_run",
+                            "result": {
+                                "would_allow": False,
+                                "would_block": False,
+                                "would_require_approval": True,
+                                "reason": "Tool 'restart_service' requires human approval",
+                            },
+                        },
+                    },
+                }
+            }
+        },
+    },
+    202: {
+        "description": "Approval required",
+        "content": {
+            "application/json": {
+                "example": {
+                    "detail": {
+                        "message": "Tool 'restart_service' requires human approval",
+                        "approval_id": "apr-demo123456",
+                    }
+                }
+            }
+        },
+    },
+    403: {"description": "Blocked by policy or capability gate"},
+    404: {"description": "Tool not found"},
+}
+
+EXPLAIN_RESPONSES = {
+    200: {
+        "description": "Structured decision trace",
+        "content": {
+            "application/json": {
+                "example": {
+                    "decision": "require_approval",
+                    "reason_chain": [
+                        "Capability gate skipped because no capabilities were provided",
+                        "Tool 'restart_service' requires human approval",
+                    ],
+                    "capability_result": "not_applicable",
+                    "policy_result": "require_approval",
+                    "final_decision": "require_approval",
+                }
+            }
+        },
+    }
+}
+
 
 class ExecuteRequest(BaseModel):
     agent_name: str = Field(..., examples=["sales_agent"])
@@ -87,8 +186,9 @@ def root() -> RedirectResponse:
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
-@app.post("/execute")
-def execute(request: ExecuteRequest) -> dict:
+
+@app.post("/execute", responses=EXECUTE_RESPONSES)
+def execute(request: ExecuteRequest = Body(..., openapi_examples=EXECUTE_REQUEST_EXAMPLES)) -> dict:
     try:
         result = interceptor.execute(
             agent_name=request.agent_name,
@@ -106,8 +206,8 @@ def execute(request: ExecuteRequest) -> dict:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@app.post("/explain")
-def explain(request: ExecuteRequest) -> dict:
+@app.post("/explain", responses=EXPLAIN_RESPONSES)
+def explain(request: ExecuteRequest = Body(..., openapi_examples=EXECUTE_REQUEST_EXAMPLES)) -> dict:
     trace = interceptor.explain(
         InterceptionRequest(
             context=interceptor_context_from_request(request),

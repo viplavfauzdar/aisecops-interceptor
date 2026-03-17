@@ -747,6 +747,7 @@ curl http://127.0.0.1:8000/health
 
 # interactive API docs
 # open http://127.0.0.1:8000/docs
+# the Swagger docs include ready-to-run request and response examples for /execute and /explain
 
 # run demos
 python -m examples.agent_demo
@@ -841,7 +842,7 @@ Current tests validate:
 Latest verified local run:
 
 ```
-78 passed
+79 passed
 ```
 
 ---

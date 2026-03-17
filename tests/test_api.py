@@ -263,6 +263,28 @@ def test_execute_endpoint_dry_run_returns_approval_decision() -> None:
     assert payload["result"]["would_require_approval"] is True
 
 
+def test_openapi_includes_execute_and_explain_examples() -> None:
+    response = client.get("/openapi.json")
+    assert response.status_code == 200
+    schema = response.json()
+
+    execute_operation = schema["paths"]["/execute"]["post"]
+    explain_operation = schema["paths"]["/explain"]["post"]
+
+    execute_examples = execute_operation["requestBody"]["content"]["application/json"]["examples"]
+    assert "safe_tool_execution" in execute_examples
+    assert "approval_required_tool" in execute_examples
+    assert "dry_run_request" in execute_examples
+
+    execute_response_examples = execute_operation["responses"]["200"]["content"]["application/json"]["examples"]
+    assert "allowed_execution" in execute_response_examples
+    assert "dry_run_result" in execute_response_examples
+
+    explain_example = explain_operation["responses"]["200"]["content"]["application/json"]["example"]
+    assert explain_example["final_decision"] == "require_approval"
+    assert explain_example["capability_result"] == "not_applicable"
+
+
 def test_audit_failures_endpoint_returns_recorded_sink_failures() -> None:
     original_failures, original_persisted = _capture_sink_failure_state()
     _set_sink_failures(
