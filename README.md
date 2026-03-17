@@ -427,6 +427,16 @@ Run the end-to-end adversarial demo with:
 python -m examples.hack_the_agent_demo
 ```
 
+## Demo
+
+Record the demo with:
+
+```bash
+./scripts/run_hack_demo.sh
+```
+
+See `scripts/record_instructions.md` for the QuickTime Player and `screencapture` workflow.
+
 ### Sample output:
 
 ```text
