@@ -70,7 +70,10 @@ def test_approval_flow_serializes_pending_requests() -> None:
     )
 
     assert response.status_code == 202
-    approval_id = response.json()["detail"]["approval_id"]
+    payload = response.json()
+    assert payload["status"] == "approval_required"
+    assert payload["decision"] == "require_approval"
+    approval_id = payload["approval_id"]
 
     approvals_response = client.get("/approvals")
     assert approvals_response.status_code == 200
@@ -202,8 +205,8 @@ def test_explain_endpoint_includes_reason_chain() -> None:
         "/explain",
         json={
             "agent_name": "sales_agent",
-            "tool_name": "delete_database",
-            "arguments": {"name": "prod"},
+            "tool_name": "shell_exec",
+            "arguments": {"command": "rm -rf /tmp/demo"},
         },
     )
 
@@ -212,6 +215,42 @@ def test_explain_endpoint_includes_reason_chain() -> None:
     assert payload["final_decision"] == "blocked"
     assert any("Capability gate skipped" in item or "globally blocked" in item for item in payload["reason_chain"])
     assert any("globally blocked" in item for item in payload["reason_chain"])
+
+
+def test_execute_endpoint_returns_structured_block_response() -> None:
+    response = client.post(
+        "/execute",
+        json={
+            "agent_name": "sales_agent",
+            "tool_name": "shell_exec",
+            "arguments": {"command": "rm -rf /tmp/demo"},
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "status": "blocked",
+        "decision": "blocked",
+        "reason": "Tool 'shell_exec' is globally blocked",
+    }
+
+
+def test_explain_endpoint_returns_structured_not_found_response() -> None:
+    response = client.post(
+        "/explain",
+        json={
+            "agent_name": "sales_agent",
+            "tool_name": "missing_tool",
+            "arguments": {},
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "status": "not_found",
+        "decision": "not_found",
+        "reason": "Tool 'missing_tool' not found",
+    }
 
 
 def test_execute_endpoint_dry_run_does_not_execute_tool() -> None:
@@ -280,9 +319,26 @@ def test_openapi_includes_execute_and_explain_examples() -> None:
     assert "allowed_execution" in execute_response_examples
     assert "dry_run_result" in execute_response_examples
 
-    explain_example = explain_operation["responses"]["200"]["content"]["application/json"]["example"]
-    assert explain_example["final_decision"] == "require_approval"
-    assert explain_example["capability_result"] == "not_applicable"
+    approval_response = execute_operation["responses"]["202"]["content"]["application/json"]["example"]
+    assert approval_response["status"] == "approval_required"
+    assert approval_response["decision"] == "require_approval"
+
+    blocked_response = execute_operation["responses"]["403"]["content"]["application/json"]["examples"]["policy_block"][
+        "value"
+    ]
+    assert blocked_response["status"] == "blocked"
+    assert blocked_response["decision"] == "blocked"
+
+    not_found_response = execute_operation["responses"]["404"]["content"]["application/json"]["example"]
+    assert not_found_response["status"] == "not_found"
+
+    explain_examples = explain_operation["responses"]["200"]["content"]["application/json"]["examples"]
+    assert explain_examples["require_approval"]["value"]["final_decision"] == "require_approval"
+    assert explain_examples["blocked"]["value"]["final_decision"] == "blocked"
+    assert explain_examples["allowed"]["value"]["final_decision"] == "allowed"
+
+    explain_not_found = explain_operation["responses"]["404"]["content"]["application/json"]["example"]
+    assert explain_not_found["status"] == "not_found"
 
 
 def test_audit_failures_endpoint_returns_recorded_sink_failures() -> None:

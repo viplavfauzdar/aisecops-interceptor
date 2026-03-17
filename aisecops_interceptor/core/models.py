@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable
 
+from pydantic import BaseModel
+
 from aisecops_interceptor.core.context import RuntimeContext
 
 
@@ -48,6 +50,50 @@ class DryRunResult:
     would_block: bool
     would_require_approval: bool
     reason: str
+
+
+class DryRunResultModel(BaseModel):
+    would_allow: bool
+    would_block: bool
+    would_require_approval: bool
+    reason: str
+
+
+class ExecuteAllowedResponse(BaseModel):
+    status: str
+    result: dict[str, Any]
+
+
+class ExecuteDryRunResponse(BaseModel):
+    status: str
+    result: DryRunResultModel
+
+
+class ApprovalRequiredResponse(BaseModel):
+    status: str
+    decision: str
+    reason: str
+    approval_id: str
+
+
+class BlockedResponse(BaseModel):
+    status: str
+    decision: str
+    reason: str
+
+
+class ToolNotFoundResponse(BaseModel):
+    status: str
+    decision: str
+    reason: str
+
+
+class ExplainResponse(BaseModel):
+    decision: str
+    reason_chain: list[str]
+    capability_result: str
+    policy_result: str
+    final_decision: str
 
 
 @dataclass(slots=True)
