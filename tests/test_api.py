@@ -49,7 +49,12 @@ def test_execute_endpoint_allows_and_serializes_audit_event() -> None:
     )
 
     assert response.status_code == 200
-    assert response.json()["result"] == {"customer_id": "123", "status": "active"}
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert payload["decision"] == "allow"
+    assert payload["reason"] == "Allowed by policy"
+    assert payload["data"] == {"customer_id": "123", "status": "active"}
+    assert payload["trace"]["final_decision"] == "allowed"
 
     audit_response = client.get("/audit")
     assert audit_response.status_code == 200
@@ -71,9 +76,11 @@ def test_approval_flow_serializes_pending_requests() -> None:
 
     assert response.status_code == 202
     payload = response.json()
-    assert payload["status"] == "approval_required"
+    assert payload["status"] == "require_approval"
     assert payload["decision"] == "require_approval"
-    approval_id = payload["approval_id"]
+    assert payload["data"]["approval_id"]
+    approval_id = payload["data"]["approval_id"]
+    assert payload["trace"]["final_decision"] == "require_approval"
 
     approvals_response = client.get("/approvals")
     assert approvals_response.status_code == 200
@@ -168,14 +175,17 @@ def test_explain_endpoint_returns_structured_decision() -> None:
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 202
     payload = response.json()
+    assert payload["status"] == "require_approval"
     assert payload["decision"] == "require_approval"
-    assert payload["capability_result"] == "not_applicable"
-    assert payload["policy_result"] == "require_approval"
-    assert payload["final_decision"] == "require_approval"
-    assert any("risk: high" in item for item in payload["reason_chain"])
-    assert any("cap_service_ops" in item for item in payload["reason_chain"])
+    assert payload["reason"] == "Tool 'restart_service' requires human approval"
+    assert payload["data"] is None
+    assert payload["trace"]["capability_result"] == "not_applicable"
+    assert payload["trace"]["policy_result"] == "require_approval"
+    assert payload["trace"]["final_decision"] == "require_approval"
+    assert any("risk: high" in item for item in payload["trace"]["reason_chain"])
+    assert any("cap_service_ops" in item for item in payload["trace"]["reason_chain"])
 
 
 def test_explain_endpoint_does_not_execute_tool() -> None:
@@ -212,11 +222,13 @@ def test_explain_endpoint_includes_reason_chain() -> None:
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 403
     payload = response.json()
-    assert payload["final_decision"] == "blocked"
-    assert any("Capability gate skipped" in item or "globally blocked" in item for item in payload["reason_chain"])
-    assert any("globally blocked" in item for item in payload["reason_chain"])
+    assert payload["status"] == "blocked"
+    assert payload["decision"] == "block"
+    assert payload["trace"]["final_decision"] == "blocked"
+    assert any("Capability gate skipped" in item or "globally blocked" in item for item in payload["trace"]["reason_chain"])
+    assert any("globally blocked" in item for item in payload["trace"]["reason_chain"])
 
 
 def test_execute_endpoint_returns_structured_block_response() -> None:
@@ -232,8 +244,19 @@ def test_execute_endpoint_returns_structured_block_response() -> None:
     assert response.status_code == 403
     assert response.json() == {
         "status": "blocked",
-        "decision": "blocked",
+        "decision": "block",
         "reason": "Tool 'shell_exec' is globally blocked",
+        "data": None,
+        "trace": {
+            "reason_chain": [
+                "Capability gate skipped because no capabilities were provided",
+                "Tool 'shell_exec' is globally blocked",
+            ],
+            "capability_result": "not_applicable",
+            "policy_result": "blocked",
+            "final_decision": "blocked",
+            "capability_metadata": None,
+        },
     }
 
 
@@ -249,9 +272,11 @@ def test_explain_endpoint_returns_structured_not_found_response() -> None:
 
     assert response.status_code == 404
     assert response.json() == {
-        "status": "not_found",
-        "decision": "not_found",
+        "status": "blocked",
+        "decision": "block",
         "reason": "Tool 'missing_tool' not found",
+        "data": None,
+        "trace": None,
     }
 
 
@@ -277,9 +302,11 @@ def test_execute_endpoint_dry_run_does_not_execute_tool() -> None:
         assert response.status_code == 200
         payload = response.json()
         assert payload["status"] == "dry_run"
-        assert payload["result"]["would_allow"] is True
-        assert payload["result"]["would_block"] is False
-        assert payload["result"]["would_require_approval"] is False
+        assert payload["decision"] == "allow"
+        assert payload["data"]["would_allow"] is True
+        assert payload["data"]["would_block"] is False
+        assert payload["data"]["would_require_approval"] is False
+        assert payload["trace"]["final_decision"] == "allowed"
         assert executed["called"] is False
     finally:
         tool_registry["read_customer"] = previous_tool
@@ -299,9 +326,11 @@ def test_execute_endpoint_dry_run_returns_approval_decision() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "dry_run"
-    assert payload["result"]["would_allow"] is False
-    assert payload["result"]["would_block"] is False
-    assert payload["result"]["would_require_approval"] is True
+    assert payload["decision"] == "require_approval"
+    assert payload["data"]["would_allow"] is False
+    assert payload["data"]["would_block"] is False
+    assert payload["data"]["would_require_approval"] is True
+    assert payload["trace"]["final_decision"] == "require_approval"
 
 
 def test_openapi_includes_execute_and_explain_examples() -> None:
@@ -322,25 +351,36 @@ def test_openapi_includes_execute_and_explain_examples() -> None:
     assert "dry_run_result" in execute_response_examples
 
     approval_response = execute_operation["responses"]["202"]["content"]["application/json"]["example"]
-    assert approval_response["status"] == "approval_required"
+    assert approval_response["status"] == "require_approval"
     assert approval_response["decision"] == "require_approval"
+    assert "data" in approval_response
 
     blocked_response = execute_operation["responses"]["403"]["content"]["application/json"]["examples"]["policy_block"][
         "value"
     ]
     assert blocked_response["status"] == "blocked"
-    assert blocked_response["decision"] == "blocked"
+    assert blocked_response["decision"] == "block"
 
     not_found_response = execute_operation["responses"]["404"]["content"]["application/json"]["example"]
-    assert not_found_response["status"] == "not_found"
+    assert not_found_response["status"] == "blocked"
+    assert not_found_response["decision"] == "block"
 
-    explain_examples = explain_operation["responses"]["200"]["content"]["application/json"]["examples"]
-    assert explain_examples["require_approval"]["value"]["final_decision"] == "require_approval"
-    assert explain_examples["blocked"]["value"]["final_decision"] == "blocked"
-    assert explain_examples["allowed"]["value"]["final_decision"] == "allowed"
+    explain_success = explain_operation["responses"]["200"]["content"]["application/json"]["examples"]["allowed"]["value"]
+    assert explain_success["status"] == "success"
+    assert explain_success["decision"] == "allow"
+    assert explain_success["trace"]["final_decision"] == "allowed"
+
+    explain_approval = explain_operation["responses"]["202"]["content"]["application/json"]["example"]
+    assert explain_approval["status"] == "require_approval"
+    assert explain_approval["trace"]["final_decision"] == "require_approval"
+
+    explain_blocked = explain_operation["responses"]["403"]["content"]["application/json"]["examples"]["blocked"]["value"]
+    assert explain_blocked["status"] == "blocked"
+    assert explain_blocked["decision"] == "block"
+    assert explain_blocked["trace"]["final_decision"] == "blocked"
 
     explain_not_found = explain_operation["responses"]["404"]["content"]["application/json"]["example"]
-    assert explain_not_found["status"] == "not_found"
+    assert explain_not_found["status"] == "blocked"
 
 
 def test_audit_failures_endpoint_returns_recorded_sink_failures() -> None:

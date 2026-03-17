@@ -809,6 +809,13 @@ AISecOps Interceptor exposes two primary endpoints:
 - **Does NOT execute the tool**
 - Returns a structured decision trace
 
+Both endpoints now use a consistent response envelope:
+- `status`: `success`, `blocked`, `require_approval`, or `dry_run`
+- `decision`: `allow`, `block`, or `require_approval`
+- `reason`: primary human-readable outcome
+- `data`: optional execution or approval payload
+- `trace`: optional structured decision trace
+
 Example:
 
 ```bash
@@ -825,20 +832,25 @@ Example response:
 
 ```json
 {
+  "status": "require_approval",
   "decision": "require_approval",
-  "capability_result": "not_applicable",
-  "policy_result": "require_approval",
-  "final_decision": "require_approval",
-  "reason_chain": [
-    "Capability gate skipped because no capabilities were provided",
-    "Capability cap_service_ops (risk: high) governs access to restart_service",
-    "Tool 'restart_service' requires human approval"
-  ],
-  "capability_metadata": {
-    "cap_service_ops": {
-      "tools": ["restart_service", "stop_service"],
-      "description": "Manage service lifecycle operations",
-      "risk": "high"
+  "reason": "Tool 'restart_service' requires human approval",
+  "data": null,
+  "trace": {
+    "capability_result": "not_applicable",
+    "policy_result": "require_approval",
+    "final_decision": "require_approval",
+    "reason_chain": [
+      "Capability gate skipped because no capabilities were provided",
+      "Capability cap_service_ops (risk: high) governs access to restart_service",
+      "Tool 'restart_service' requires human approval"
+    ],
+    "capability_metadata": {
+      "cap_service_ops": {
+        "tools": ["restart_service", "stop_service"],
+        "description": "Manage service lifecycle operations",
+        "risk": "high"
+      }
     }
   }
 }

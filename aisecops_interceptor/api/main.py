@@ -13,15 +13,11 @@ from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.exceptions import ApprovalRequiredError, PolicyViolationError, ToolNotFoundError
 from aisecops_interceptor.core.interceptor import AgentInterceptor
 from aisecops_interceptor.core.models import (
-    ApprovalRequiredResponse,
-    BlockedResponse,
+    APIResponse,
     DryRunResultModel,
-    ExecuteAllowedResponse,
-    ExecuteDryRunResponse,
-    ExplainResponse,
+    ExplainTraceModel,
     InterceptionRequest,
     ToolCall,
-    ToolNotFoundResponse,
 )
 from aisecops_interceptor.core.policy import PolicyEngine
 from aisecops_interceptor.integrations.openclaw_adapter import OpenClawToolRunnerAdapter
@@ -109,25 +105,50 @@ EXECUTE_REQUEST_EXAMPLES = {
 EXECUTE_RESPONSES = {
     200: {
         "description": "Allowed execution or dry-run decision",
+        "model": APIResponse,
         "content": {
             "application/json": {
                 "examples": {
                     "allowed_execution": {
                         "summary": "Allowed execution",
                         "value": {
-                            "status": "allowed",
-                            "result": {"customer_id": "123", "status": "active"},
+                            "status": "success",
+                            "decision": "allow",
+                            "reason": "Allowed by policy",
+                            "data": {"customer_id": "123", "status": "active"},
+                            "trace": {
+                                "reason_chain": [
+                                    "Capability gate skipped because no capabilities were provided",
+                                    "Capability cap_customer_read (risk: medium) governs access to read_customer",
+                                    "Allowed by policy",
+                                ],
+                                "capability_result": "not_applicable",
+                                "policy_result": "allowed",
+                                "final_decision": "allowed",
+                            },
                         },
                     },
                     "dry_run_result": {
                         "summary": "Dry-run result",
                         "value": {
                             "status": "dry_run",
-                            "result": {
+                            "decision": "require_approval",
+                            "reason": "Tool 'restart_service' requires human approval",
+                            "data": {
                                 "would_allow": False,
                                 "would_block": False,
                                 "would_require_approval": True,
                                 "reason": "Tool 'restart_service' requires human approval",
+                            },
+                            "trace": {
+                                "reason_chain": [
+                                    "Capability gate skipped because no capabilities were provided",
+                                    "Capability cap_service_ops (risk: high) governs access to restart_service",
+                                    "Tool 'restart_service' requires human approval",
+                                ],
+                                "capability_result": "not_applicable",
+                                "policy_result": "require_approval",
+                                "final_decision": "require_approval",
                             },
                         },
                     },
@@ -137,21 +158,31 @@ EXECUTE_RESPONSES = {
     },
     202: {
         "description": "Approval required",
-        "model": ApprovalRequiredResponse,
+        "model": APIResponse,
         "content": {
             "application/json": {
                 "example": {
-                    "status": "approval_required",
+                    "status": "require_approval",
                     "decision": "require_approval",
                     "reason": "Tool 'restart_service' requires human approval",
-                    "approval_id": "apr-demo123456",
+                    "data": {"approval_id": "apr-demo123456"},
+                    "trace": {
+                        "reason_chain": [
+                            "Capability gate skipped because no capabilities were provided",
+                            "Capability cap_service_ops (risk: high) governs access to restart_service",
+                            "Tool 'restart_service' requires human approval",
+                        ],
+                        "capability_result": "not_applicable",
+                        "policy_result": "require_approval",
+                        "final_decision": "require_approval",
+                    },
                 }
             }
         },
     },
     403: {
         "description": "Blocked by policy or capability gate",
-        "model": BlockedResponse,
+        "model": APIResponse,
         "content": {
             "application/json": {
                 "examples": {
@@ -159,16 +190,18 @@ EXECUTE_RESPONSES = {
                         "summary": "Blocked by policy",
                         "value": {
                             "status": "blocked",
-                            "decision": "blocked",
+                            "decision": "block",
                             "reason": "Tool 'shell_exec' is globally blocked",
+                            "data": None,
                         },
                     },
                     "capability_block": {
                         "summary": "Blocked by capability gate",
                         "value": {
                             "status": "blocked",
-                            "decision": "blocked",
+                            "decision": "block",
                             "reason": "Tool 'restart_service' requires one of the granted capabilities: cap_service_ops",
+                            "data": None,
                         },
                     },
                 }
@@ -177,13 +210,14 @@ EXECUTE_RESPONSES = {
     },
     404: {
         "description": "Tool not found",
-        "model": ToolNotFoundResponse,
+        "model": APIResponse,
         "content": {
             "application/json": {
                 "example": {
-                    "status": "not_found",
-                    "decision": "not_found",
+                    "status": "blocked",
+                    "decision": "block",
                     "reason": "Tool 'missing_tool' not found",
+                    "data": None,
                 }
             }
         },
@@ -193,53 +227,93 @@ EXECUTE_RESPONSES = {
 EXPLAIN_RESPONSES = {
     200: {
         "description": "Structured decision trace",
+        "model": APIResponse,
         "content": {
             "application/json": {
                 "examples": {
-                    "require_approval": {
-                        "summary": "Approval-required decision",
-                        "value": {
-                            "decision": "require_approval",
-                            "reason_chain": [
-                                "Capability gate skipped because no capabilities were provided",
-                                "Tool 'restart_service' requires human approval",
-                            ],
-                            "capability_result": "not_applicable",
-                            "policy_result": "require_approval",
-                            "final_decision": "require_approval",
-                            "capability_metadata": {
-                                "cap_service_ops": {
-                                    "tools": ["restart_service", "stop_service"],
-                                    "description": "Manage service lifecycle operations",
-                                    "risk": "high",
-                                }
-                            },
-                        },
-                    },
-                    "blocked": {
-                        "summary": "Blocked decision",
-                        "value": {
-                            "decision": "blocked",
-                            "reason_chain": [
-                                "Capability gate skipped because no capabilities were provided",
-                                "Tool 'delete_database' is globally blocked",
-                            ],
-                            "capability_result": "not_applicable",
-                            "policy_result": "blocked",
-                            "final_decision": "blocked",
-                        },
-                    },
                     "allowed": {
                         "summary": "Allowed decision",
                         "value": {
-                            "decision": "allowed",
-                            "reason_chain": [
-                                "Capability gate skipped because no capabilities were provided",
-                                "Tool 'read_customer' is allowed",
-                            ],
-                            "capability_result": "not_applicable",
-                            "policy_result": "allowed",
-                            "final_decision": "allowed",
+                            "status": "success",
+                            "decision": "allow",
+                            "reason": "Allowed by policy",
+                            "data": None,
+                            "trace": {
+                                "reason_chain": [
+                                    "Capability gate skipped because no capabilities were provided",
+                                    "Capability cap_customer_read (risk: medium) governs access to read_customer",
+                                    "Allowed by policy",
+                                ],
+                                "capability_result": "not_applicable",
+                                "policy_result": "allowed",
+                                "final_decision": "allowed",
+                                "capability_metadata": {
+                                    "cap_customer_read": {
+                                        "tools": ["read_customer"],
+                                        "description": "Read customer account records",
+                                        "risk": "medium",
+                                    }
+                                },
+                            },
+                        },
+                    },
+                }
+            }
+        },
+    },
+    202: {
+        "description": "Approval required decision trace",
+        "model": APIResponse,
+        "content": {
+            "application/json": {
+                "example": {
+                    "status": "require_approval",
+                    "decision": "require_approval",
+                    "reason": "Tool 'restart_service' requires human approval",
+                    "data": None,
+                    "trace": {
+                        "reason_chain": [
+                            "Capability gate skipped because no capabilities were provided",
+                            "Capability cap_service_ops (risk: high) governs access to restart_service",
+                            "Tool 'restart_service' requires human approval",
+                        ],
+                        "capability_result": "not_applicable",
+                        "policy_result": "require_approval",
+                        "final_decision": "require_approval",
+                        "capability_metadata": {
+                            "cap_service_ops": {
+                                "tools": ["restart_service", "stop_service"],
+                                "description": "Manage service lifecycle operations",
+                                "risk": "high",
+                            }
+                        },
+                    },
+                }
+            }
+        },
+    },
+    403: {
+        "description": "Blocked decision trace",
+        "model": APIResponse,
+        "content": {
+            "application/json": {
+                "examples": {
+                    "blocked": {
+                        "summary": "Blocked decision",
+                        "value": {
+                            "status": "blocked",
+                            "decision": "block",
+                            "reason": "Tool 'shell_exec' is globally blocked",
+                            "data": None,
+                            "trace": {
+                                "reason_chain": [
+                                    "Capability gate skipped because no capabilities were provided",
+                                    "Tool 'shell_exec' is globally blocked",
+                                ],
+                                "capability_result": "not_applicable",
+                                "policy_result": "blocked",
+                                "final_decision": "blocked",
+                            },
                         },
                     },
                 }
@@ -248,13 +322,14 @@ EXPLAIN_RESPONSES = {
     },
     404: {
         "description": "Tool not found",
-        "model": ToolNotFoundResponse,
+        "model": APIResponse,
         "content": {
             "application/json": {
                 "example": {
-                    "status": "not_found",
-                    "decision": "not_found",
+                    "status": "blocked",
+                    "decision": "block",
                     "reason": "Tool 'missing_tool' not found",
+                    "data": None,
                 }
             }
         },
@@ -283,83 +358,8 @@ class OpenClawExecuteRequest(BaseModel):
     correlation_id: str | None = None
 
 
-def _approval_required_response(exc: ApprovalRequiredError) -> JSONResponse:
-    return JSONResponse(
-        status_code=202,
-        content=ApprovalRequiredResponse(
-            status="approval_required",
-            decision="require_approval",
-            reason=str(exc),
-            approval_id=exc.approval_id,
-        ).model_dump(),
-    )
-
-
-def _blocked_response(exc: PolicyViolationError) -> JSONResponse:
-    return JSONResponse(
-        status_code=403,
-        content=BlockedResponse(
-            status="blocked",
-            decision="blocked",
-            reason=str(exc),
-        ).model_dump(),
-    )
-
-
-def _tool_not_found_response(tool_name: str) -> JSONResponse:
-    return JSONResponse(
-        status_code=404,
-        content=ToolNotFoundResponse(
-            status="not_found",
-            decision="not_found",
-            reason=f"Tool '{tool_name}' not found",
-        ).model_dump(),
-    )
-
-
-@app.post(
-    "/execute",
-    responses=EXECUTE_RESPONSES,
-    response_model=ExecuteAllowedResponse | ExecuteDryRunResponse,
-)
-def execute(request: ExecuteRequest = Body(..., openapi_examples=EXECUTE_REQUEST_EXAMPLES)) -> dict:
-    try:
-        result = interceptor.execute(
-            agent_name=request.agent_name,
-            tool_call=ToolCall(name=request.tool_name, arguments=request.arguments),
-            tool_registry=tool_registry,
-            approval_id=request.approval_id,
-            dry_run=request.dry_run,
-        )
-        if request.dry_run:
-            return ExecuteDryRunResponse(
-                status="dry_run",
-                result=DryRunResultModel.model_validate(asdict(result)),
-            ).model_dump()
-        return ExecuteAllowedResponse(status="allowed", result=result).model_dump()
-    except ApprovalRequiredError as exc:
-        return _approval_required_response(exc)
-    except PolicyViolationError as exc:
-        return _blocked_response(exc)
-    except ToolNotFoundError:
-        return _tool_not_found_response(request.tool_name)
-
-
-@app.post("/explain", responses=EXPLAIN_RESPONSES, response_model=ExplainResponse)
-def explain(request: ExecuteRequest = Body(..., openapi_examples=EXECUTE_REQUEST_EXAMPLES)) -> dict:
-    if request.tool_name not in tool_registry:
-        return _tool_not_found_response(request.tool_name)
-
-    trace = interceptor.explain(
-        InterceptionRequest(
-            context=interceptor_context_from_request(request),
-            tool_registry=tool_registry,
-            approval_id=request.approval_id,
-            dry_run=request.dry_run,
-        )
-    )
-    return ExplainResponse(
-        decision=trace.decision,
+def _trace_payload(trace) -> ExplainTraceModel:
+    return ExplainTraceModel(
         reason_chain=trace.reason_chain,
         capability_result=trace.capability_result,
         policy_result=trace.policy_result,
@@ -372,7 +372,128 @@ def explain(request: ExecuteRequest = Body(..., openapi_examples=EXECUTE_REQUEST
             if trace.capability_metadata is not None
             else None
         ),
-    ).model_dump()
+    )
+
+
+def _approval_required_response(exc: ApprovalRequiredError, trace) -> JSONResponse:
+    return JSONResponse(
+        status_code=202,
+        content=APIResponse(
+            status="require_approval",
+            decision="require_approval",
+            reason=str(exc),
+            data={"approval_id": exc.approval_id},
+            trace=_trace_payload(trace),
+        ).model_dump(),
+    )
+
+
+def _blocked_response(exc: PolicyViolationError, trace=None) -> JSONResponse:
+    return JSONResponse(
+        status_code=403,
+        content=APIResponse(
+            status="blocked",
+            decision="block",
+            reason=str(exc),
+            trace=_trace_payload(trace) if trace is not None else None,
+        ).model_dump(),
+    )
+
+
+def _tool_not_found_response(tool_name: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=404,
+        content=APIResponse(
+            status="blocked",
+            decision="block",
+            reason=f"Tool '{tool_name}' not found",
+        ).model_dump(),
+    )
+
+
+@app.post(
+    "/execute",
+    responses=EXECUTE_RESPONSES,
+    response_model=APIResponse,
+)
+def execute(request: ExecuteRequest = Body(..., openapi_examples=EXECUTE_REQUEST_EXAMPLES)) -> dict:
+    if request.tool_name not in tool_registry:
+        return _tool_not_found_response(request.tool_name)
+
+    trace = interceptor.explain(
+        InterceptionRequest(
+            context=interceptor_context_from_request(request),
+            tool_registry=tool_registry,
+            approval_id=request.approval_id,
+            dry_run=request.dry_run,
+        )
+    )
+    try:
+        result = interceptor.execute(
+            agent_name=request.agent_name,
+            tool_call=ToolCall(name=request.tool_name, arguments=request.arguments),
+            tool_registry=tool_registry,
+            approval_id=request.approval_id,
+            dry_run=request.dry_run,
+        )
+        if request.dry_run:
+            decision = "require_approval" if result.would_require_approval else ("block" if result.would_block else "allow")
+            return APIResponse(
+                status="dry_run",
+                decision=decision,
+                reason=result.reason,
+                data=DryRunResultModel.model_validate(asdict(result)).model_dump(),
+                trace=_trace_payload(trace),
+            ).model_dump()
+        return APIResponse(
+            status="success",
+            decision="allow",
+            reason=trace.policy_reason or "Allowed by policy",
+            data=result,
+            trace=_trace_payload(trace),
+        ).model_dump()
+    except ApprovalRequiredError as exc:
+        return _approval_required_response(exc, trace)
+    except PolicyViolationError as exc:
+        return _blocked_response(exc, trace)
+    except ToolNotFoundError:
+        return _tool_not_found_response(request.tool_name)
+
+
+@app.post("/explain", responses=EXPLAIN_RESPONSES, response_model=APIResponse)
+def explain(request: ExecuteRequest = Body(..., openapi_examples=EXECUTE_REQUEST_EXAMPLES)) -> dict:
+    if request.tool_name not in tool_registry:
+        return _tool_not_found_response(request.tool_name)
+
+    trace = interceptor.explain(
+        InterceptionRequest(
+            context=interceptor_context_from_request(request),
+            tool_registry=tool_registry,
+            approval_id=request.approval_id,
+            dry_run=request.dry_run,
+        )
+    )
+    status_code = 200
+    status = "success"
+    decision = "allow"
+    if trace.final_decision == "require_approval":
+        status_code = 202
+        status = "require_approval"
+        decision = "require_approval"
+    elif trace.final_decision == "blocked":
+        status_code = 403
+        status = "blocked"
+        decision = "block"
+
+    return JSONResponse(
+        status_code=status_code,
+        content=APIResponse(
+            status=status,
+            decision=decision,
+            reason=trace.policy_reason or trace.capability_reason or (trace.reason_chain[-1] if trace.reason_chain else "Decision evaluated"),
+            trace=_trace_payload(trace),
+        ).model_dump(),
+    )
 
 
 @app.get("/", include_in_schema=False)

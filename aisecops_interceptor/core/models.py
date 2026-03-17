@@ -67,42 +67,20 @@ class DryRunResultModel(BaseModel):
     reason: str
 
 
-class ExecuteAllowedResponse(BaseModel):
-    status: str
-    result: dict[str, Any]
-
-
-class ExecuteDryRunResponse(BaseModel):
-    status: str
-    result: DryRunResultModel
-
-
-class ApprovalRequiredResponse(BaseModel):
-    status: str
-    decision: str
-    reason: str
-    approval_id: str
-
-
-class BlockedResponse(BaseModel):
-    status: str
-    decision: str
-    reason: str
-
-
-class ToolNotFoundResponse(BaseModel):
-    status: str
-    decision: str
-    reason: str
-
-
-class ExplainResponse(BaseModel):
-    decision: str
+class ExplainTraceModel(BaseModel):
     reason_chain: list[str]
     capability_result: str
     policy_result: str
     final_decision: str
     capability_metadata: dict[str, dict[str, Any]] | None = None
+
+
+class APIResponse(BaseModel):
+    status: str
+    decision: str
+    reason: str
+    data: dict[str, Any] | None = None
+    trace: ExplainTraceModel | None = None
 
 
 @dataclass(slots=True)
