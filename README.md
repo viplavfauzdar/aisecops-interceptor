@@ -864,9 +864,18 @@ This endpoint is useful for:
 ## Minimal example
 
 For a working end‑to‑end example showing interception, policy evaluation, and tool execution control, run:
+For a working end‑to‑end example showing interception, policy evaluation, and tool execution control, run:
 
 ```bash
 python -m examples.agent_demo
+```
+
+Additional demos:
+
+```bash
+python -m examples.hack_the_agent_demo
+python -m examples.capabilities_demo
+python -m examples.policy_bundle_demo
 ```
 
 Additional demos:

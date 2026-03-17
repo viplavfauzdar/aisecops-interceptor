@@ -23,6 +23,11 @@ class CapabilityRegistry:
         bundle = load_capability_bundle(path)
         return cls(bundle.capabilities)
 
+    @classmethod
+    def from_yaml(cls, path: str | None = None) -> "CapabilityRegistry":
+        bundle = load_capability_bundle(path)
+        return cls(bundle.capabilities)
+
     def required_capabilities_for_tool(self, tool_name: str) -> tuple[str, ...]:
         return tuple(
             sorted(
