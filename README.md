@@ -508,7 +508,12 @@ create_llm_client(LLMConfig)
 
 `PolicyEngine` can evaluate an ordered set of declarative rules before falling back to the existing config-driven checks.
 When `RuntimeContext.allowed_capabilities` is provided, a capability gate runs before policy evaluation. That gate maps granted capabilities to tool names and blocks any tool request that is not explicitly granted.
-The policy layer also includes a built-in high-risk tool preset. By default, tools such as `restart_service`, `execute_shell`, `delete_user`, and `export_data` require approval unless an explicit policy rule overrides that outcome.
+The policy layer also includes a built-in high-risk tool preset. By default, tools such as `restart_service`, `shell_exec`, `delete_user`, and `export_data` require approval unless an explicit policy rule overrides that outcome.
+
+Configuration responsibilities are separated deliberately:
+
+- `policies/capabilities.yaml` contains only capability-to-tool mappings and optional capability metadata
+- `policies/policies.yaml` contains only policy behavior such as blocked tools, monitored tools, dangerous patterns, high-risk tools, and per-agent policy settings
 
 Each rule supports:
 
@@ -540,6 +545,30 @@ capabilities:
 `description` and `risk` are optional metadata fields. They load with the capability definition and can be surfaced in explainability flows, but they do not change capability-gate decisions by themselves.
 
 If an agent receives `allowed_capabilities=["cap_service_ops"]`, it can request `restart_service`. If the capability list is omitted, current behavior remains unchanged and the interceptor falls back to the existing policy flow. Direct Python mappings still work, but YAML-backed loading is the preferred path.
+
+Policy behavior belongs in `policies/policies.yaml`, for example:
+
+```yaml
+blocked_tools:
+  - delete_database
+  - shell_exec
+
+monitored_tools:
+  - send_email
+  - create_incident
+
+high_risk_tools:
+  - restart_service
+
+agents:
+  ops_agent:
+    allowed_tools:
+      - get_deployment_status
+      - create_incident
+      - restart_service
+    approval_required_tools:
+      - restart_service
+```
 
 Example:
 
@@ -797,13 +826,21 @@ Example response:
 ```json
 {
   "decision": "require_approval",
-  "capability_result": "allowed",
+  "capability_result": "not_applicable",
   "policy_result": "require_approval",
   "final_decision": "require_approval",
   "reason_chain": [
-    "Capability check passed for tool restart_service",
-    "Policy rule matched: restart_service → require_approval"
-  ]
+    "Capability gate skipped because no capabilities were provided",
+    "Capability cap_service_ops (risk: high) governs access to restart_service",
+    "Tool 'restart_service' requires human approval"
+  ],
+  "capability_metadata": {
+    "cap_service_ops": {
+      "tools": ["restart_service", "stop_service"],
+      "description": "Manage service lifecycle operations",
+      "risk": "high"
+    }
+  }
 }
 ```
 
@@ -849,7 +886,7 @@ Current tests validate:
 Latest verified local run:
 
 ```
-84/84 passed
+85/85 passed
 ```
 
 ---

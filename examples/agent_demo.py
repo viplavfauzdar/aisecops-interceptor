@@ -64,17 +64,7 @@ async def main() -> None:
         audit_path.unlink()
     audit_logger = AuditLogger(log_path=str(audit_path))
     approval_store = DemoApprovalStore()
-    policy_engine = PolicyEngine(
-        {
-            "rules": [
-                {
-                    "tool_name": "restart_service",
-                    "agent_name": "ops_agent",
-                    "action": "require_approval",
-                }
-            ]
-        }
-    )
+    policy_engine = PolicyEngine.from_yaml("policies/policies.yaml")
     interceptor = AgentInterceptor(
         policy_engine=policy_engine,
         audit_logger=audit_logger,

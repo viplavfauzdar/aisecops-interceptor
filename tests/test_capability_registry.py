@@ -93,3 +93,4 @@ def test_registry_defaults_to_external_capability_bundle_path() -> None:
 
     assert registry.is_tool_allowed("restart_service", ["cap_service_ops"]) is True
     assert registry.required_capabilities_for_tool("read_customer") == ("cap_customer_read",)
+    assert registry.required_capabilities_for_tool("shell_exec") == ()

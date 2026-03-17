@@ -1,3 +1,6 @@
+# Policy bundle:
+# policy behavior only: blocked tools, monitoring, dangerous patterns,
+# high-risk presets, and per-agent policy rules.
 blocked_tools:
   - delete_database
   - shell_exec

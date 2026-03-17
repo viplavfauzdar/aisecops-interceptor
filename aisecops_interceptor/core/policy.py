@@ -11,7 +11,7 @@ from aisecops_interceptor.policy.schema import parse_policy_bundle
 
 DEFAULT_HIGH_RISK_TOOLS = (
     "restart_service",
-    "execute_shell",
+    "shell_exec",
     "delete_user",
     "export_data",
 )

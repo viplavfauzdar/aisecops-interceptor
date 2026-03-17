@@ -1,3 +1,5 @@
+# Capability bundle:
+# capability -> tool mapping and capability metadata only.
 capabilities:
   cap_service_ops:
     description: Manage service lifecycle operations

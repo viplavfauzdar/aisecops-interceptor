@@ -16,7 +16,13 @@ def restart_service(service: str) -> dict[str, str]:
 
 def main() -> None:
     interceptor = AgentInterceptor(
-        policy_engine=PolicyEngine({"agents": {"ops_agent": {"allowed_tools": ["restart_service"]}}}),
+        policy_engine=PolicyEngine(
+            {
+                "agents": {"ops_agent": {"allowed_tools": ["restart_service"]}},
+                "high_risk_tools_mode": "override",
+                "high_risk_tools": [],
+            }
+        ),
         audit_logger=AuditLogger(),
         approval_store=ApprovalStore(),
         capability_registry=CapabilityRegistry.from_yaml("policies/capabilities.yaml"),

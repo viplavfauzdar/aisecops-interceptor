@@ -95,6 +95,28 @@ def test_default_high_risk_preset_requires_approval() -> None:
     assert decision.matched_rule == "high_risk_tools"
 
 
+def test_default_high_risk_preset_uses_canonical_shell_tool_name() -> None:
+    engine = PolicyEngine(
+        {
+            "agents": {
+                "ops_agent": {
+                    "allowed_tools": ["shell_exec"],
+                },
+            },
+            "blocked_tools": [],
+        }
+    )
+
+    decision = engine.evaluate(
+        agent_name="ops_agent",
+        tool_call=ToolCall(name="shell_exec", arguments={"command": "echo ok"}),
+    )
+
+    assert decision.allowed is False
+    assert decision.requires_approval is True
+    assert decision.matched_rule == "high_risk_tools"
+
+
 def test_explicit_rule_overrides_high_risk_preset() -> None:
     engine = PolicyEngine(
         {
