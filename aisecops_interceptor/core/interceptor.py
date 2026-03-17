@@ -178,10 +178,23 @@ class AgentInterceptor:
         capability_result = "not_applicable" if context.allowed_capabilities is None else "allowed"
         if capability_result == "not_applicable":
             reason_chain.append("Capability gate skipped because no capabilities were provided")
-        else:
-            reason_chain.append(
-                f"Capability gate allowed tool '{context.tool_name}' for the granted capabilities"
+            reason_chain.extend(
+                self._capability_context_reasons(
+                    tool_name=context.tool_name,
+                    capability_result=capability_result,
+                )
             )
+        else:
+            capability_reasons = self._capability_context_reasons(
+                tool_name=context.tool_name,
+                capability_result=capability_result,
+            )
+            if capability_reasons:
+                reason_chain.extend(capability_reasons)
+            else:
+                reason_chain.append(
+                    f"Capability gate allowed tool '{context.tool_name}' for the granted capabilities"
+                )
 
         decision = self.evaluate(agent_name=context.agent_name, tool_call=tool_call, context=context)
         policy_result = "require_approval" if decision.requires_approval else ("allowed" if decision.allowed else "blocked")
@@ -219,6 +232,23 @@ class AgentInterceptor:
                 f"Tool '{context.tool_name}' requires one of the granted capabilities: {capability_list}"
             )
         return f"Tool '{context.tool_name}' is not granted by the provided capabilities"
+
+    def _capability_context_reasons(self, *, tool_name: str | None, capability_result: str) -> list[str]:
+        if tool_name is None:
+            return []
+
+        reasons: list[str] = []
+        for capability_name, definition in self.capability_registry.metadata_for_tool(tool_name).items():
+            risk_suffix = f" (risk: {definition.risk})" if definition.risk is not None else ""
+            if capability_result == "allowed":
+                reasons.append(
+                    f"Capability {capability_name}{risk_suffix} allowed access to {tool_name}"
+                )
+            else:
+                reasons.append(
+                    f"Capability {capability_name}{risk_suffix} governs access to {tool_name}"
+                )
+        return reasons
 
     def execute(
         self,

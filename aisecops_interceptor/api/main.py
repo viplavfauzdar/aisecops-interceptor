@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 
 from aisecops_interceptor.core.approval import ApprovalStore
 from aisecops_interceptor.core.audit import AuditLogger
+from aisecops_interceptor.core.capability_registry import CapabilityRegistry
 from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.exceptions import ApprovalRequiredError, PolicyViolationError, ToolNotFoundError
 from aisecops_interceptor.core.interceptor import AgentInterceptor
@@ -29,7 +30,13 @@ app = FastAPI(title="AISecOps Interceptor", version="0.3.0")
 policy = PolicyEngine.from_yaml_file()
 audit = AuditLogger(log_path="audit/audit.jsonl")
 approvals = ApprovalStore(store_path="audit/approvals.jsonl")
-interceptor = AgentInterceptor(policy_engine=policy, audit_logger=audit, approval_store=approvals)
+capabilities = CapabilityRegistry.from_yaml()
+interceptor = AgentInterceptor(
+    policy_engine=policy,
+    audit_logger=audit,
+    approval_store=approvals,
+    capability_registry=capabilities,
+)
 openclaw_adapter = OpenClawToolRunnerAdapter(interceptor=interceptor)
 
 

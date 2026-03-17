@@ -174,6 +174,8 @@ def test_explain_endpoint_returns_structured_decision() -> None:
     assert payload["capability_result"] == "not_applicable"
     assert payload["policy_result"] == "require_approval"
     assert payload["final_decision"] == "require_approval"
+    assert any("risk: high" in item for item in payload["reason_chain"])
+    assert any("cap_service_ops" in item for item in payload["reason_chain"])
 
 
 def test_explain_endpoint_does_not_execute_tool() -> None:
