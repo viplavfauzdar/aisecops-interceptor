@@ -461,7 +461,7 @@ See `scripts/record_instructions.md` for the QuickTime Player and `screencapture
 
 Example output when the interceptor blocks a malicious agent attempt:
 
-![AISecOps Interceptor blocking agent attack](docs/hack-the-agent-demo.png)
+![AISecOps Interceptor blocking agent attack](docs/hack_demo.gif)
 
 
 What it proves:
