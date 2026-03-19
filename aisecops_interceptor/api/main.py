@@ -114,13 +114,13 @@ EXECUTE_RESPONSES = {
                         "value": {
                             "status": "success",
                             "decision": "allow",
-                            "reason": "Allowed by policy",
+                            "reason": "Tool 'read_customer' allowed with audit monitoring",
                             "data": {"customer_id": "123", "status": "active"},
                             "trace": {
                                 "reason_chain": [
                                     "Capability gate skipped because no capabilities were provided",
                                     "Capability cap_customer_read (risk: medium) governs access to read_customer",
-                                    "Allowed by policy",
+                                    "Tool 'read_customer' allowed with audit monitoring",
                                 ],
                                 "capability_result": "not_applicable",
                                 "policy_result": "allowed",
@@ -236,13 +236,13 @@ EXPLAIN_RESPONSES = {
                         "value": {
                             "status": "success",
                             "decision": "allow",
-                            "reason": "Allowed by policy",
+                            "reason": "Tool 'read_customer' allowed with audit monitoring",
                             "data": None,
                             "trace": {
                                 "reason_chain": [
                                     "Capability gate skipped because no capabilities were provided",
                                     "Capability cap_customer_read (risk: medium) governs access to read_customer",
-                                    "Allowed by policy",
+                                    "Tool 'read_customer' allowed with audit monitoring",
                                 ],
                                 "capability_result": "not_applicable",
                                 "policy_result": "allowed",
