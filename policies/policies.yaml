@@ -1,27 +1,47 @@
 # Policy bundle:
 # policy behavior only: blocked tools, monitoring, dangerous patterns,
 # high-risk presets, and per-agent policy rules.
+#
+# This file answers:
+#   "What should happen when an agent asks to use a tool?"
+#
+# Recommended mental model:
+# - capabilities.yaml -> coarse-grained authorization (who may request what)
+# - policies.yaml     -> execution behavior (allow, monitor, block, approval)
+
+# Tools that should never execute through the runtime.
 blocked_tools:
   - delete_database
   - shell_exec
 
+# Tools worth monitoring even when allowed.
 monitored_tools:
   - send_email
   - create_incident
+  - read_customer
 
+# Simple high-signal patterns checked against tool arguments.
+# Keep these focused to reduce false positives.
 dangerous_argument_patterns:
   - drop table
+  - union select
   - api_key
+  - secret_key
   - ignore previous instructions
   - rm -rf
+  - /etc/passwd
 
+# Tools that default to approval unless an explicit policy overrides them.
 high_risk_tools:
   - restart_service
+  - export_data
 
 agents:
   sales_agent:
     allowed_tools:
       - read_customer
+      - send_email
+    approval_required_tools:
       - send_email
 
   ops_agent:

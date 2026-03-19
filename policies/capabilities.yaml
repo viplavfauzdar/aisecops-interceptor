@@ -1,5 +1,14 @@
 # Capability bundle:
 # capability -> tool mapping and capability metadata only.
+#
+# This file answers:
+#   "What classes of actions may an agent request?"
+#
+# Notes:
+# - `description` is human-readable metadata for docs and /explain output.
+# - `risk` is descriptive metadata only; runtime enforcement still happens in
+#   the capability gate and policy engine.
+# - `tools` should use the canonical tool names defined by the runtime.
 capabilities:
   cap_service_ops:
     description: Manage service lifecycle operations
@@ -13,3 +22,21 @@ capabilities:
     risk: medium
     tools:
       - read_customer
+
+  cap_incident_response:
+    description: Create and manage operational incident records
+    risk: medium
+    tools:
+      - create_incident
+
+  cap_deployment_read:
+    description: Read deployment and runtime service status
+    risk: low
+    tools:
+      - get_deployment_status
+
+  cap_notification_ops:
+    description: Send notifications to internal or external recipients
+    risk: medium
+    tools:
+      - send_email

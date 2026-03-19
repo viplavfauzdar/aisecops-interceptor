@@ -52,7 +52,7 @@ def test_execute_endpoint_allows_and_serializes_audit_event() -> None:
     payload = response.json()
     assert payload["status"] == "success"
     assert payload["decision"] == "allow"
-    assert payload["reason"] == "Allowed by policy"
+    assert payload["reason"] == "Tool 'read_customer' allowed with audit monitoring"
     assert payload["data"] == {"customer_id": "123", "status": "active"}
     assert payload["trace"]["final_decision"] == "allowed"
 
