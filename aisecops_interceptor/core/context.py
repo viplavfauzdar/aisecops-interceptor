@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
+from uuid import uuid4
 
 
 @dataclass(slots=True)
@@ -18,6 +19,7 @@ class RuntimeContext:
     framework: str = "custom"
     actor: str | None = None
     environment: str = "dev"
+    trace_id: str | None = None
     correlation_id: str | None = None
     allowed_capabilities: list[str] | None = None
     tags: dict[str, str] = field(default_factory=dict)
@@ -27,3 +29,8 @@ class RuntimeContext:
         from aisecops_interceptor.core.models import ToolCall
 
         return ToolCall(name=self.tool_name or "", arguments=self.arguments)
+
+    def ensure_trace_id(self) -> str:
+        if self.trace_id is None:
+            self.trace_id = uuid4().hex
+        return self.trace_id

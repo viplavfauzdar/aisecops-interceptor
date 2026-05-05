@@ -38,6 +38,25 @@ class AgentInterceptor:
         context = plan.context
         tool_call = context.to_tool_call()
         trace = plan.trace or self.evaluate(plan)
+        capability_risks = self._capability_risks_for_tool(context.tool_name)
+        self.audit_logger.log(
+            RuntimeEvent.audit_event(
+                event_type="tool_call",
+                decision="pending",
+                reason="Tool call received for execution",
+                stage="tool",
+                context=context,
+                risk_level=trace.policy_decision.risk_level if trace.policy_decision is not None else "low",
+                matched_rule=trace.policy_decision.matched_rule if trace.policy_decision is not None else None,
+                approval_id=plan.approval_id,
+                capability_risks=capability_risks,
+                payload={
+                    "tool_name": context.tool_name,
+                    "arguments": context.arguments,
+                    "dry_run": plan.dry_run,
+                },
+            )
+        )
         if trace.capability_result == "blocked":
             self.audit_logger.log(
                 RuntimeEvent.tool_event(
@@ -49,6 +68,9 @@ class AgentInterceptor:
                     risk_level="medium",
                     matched_rule="capability_gate",
                     approval_id=plan.approval_id,
+                    capability_risks=capability_risks,
+                    audit_kind="capability",
+                    payload={"capability_result": trace.capability_result},
                 )
             )
             if plan.dry_run:
@@ -81,6 +103,9 @@ class AgentInterceptor:
                     risk_level=decision.risk_level,
                     matched_rule=decision.matched_rule,
                     approval_id=approval_request.approval_id,
+                    capability_risks=capability_risks,
+                    audit_kind="decision",
+                    payload={"approval_required": True},
                 )
             )
             if plan.dry_run:
@@ -103,6 +128,9 @@ class AgentInterceptor:
                 risk_level=decision.risk_level,
                 matched_rule=decision.matched_rule,
                 approval_id=plan.approval_id,
+                capability_risks=capability_risks,
+                audit_kind="decision",
+                payload={"approved": approved, "requires_approval": decision.requires_approval},
             )
         )
 
@@ -135,6 +163,22 @@ class AgentInterceptor:
                 risk_level=decision.risk_level,
                 matched_rule=decision.matched_rule,
                 approval_id=plan.approval_id,
+                capability_risks=capability_risks,
+                audit_kind="tool_execution",
+            )
+        )
+        self.audit_logger.log(
+            RuntimeEvent.audit_event(
+                event_type="final_output",
+                decision="allowed",
+                reason="Execution completed",
+                stage="tool",
+                context=context,
+                risk_level=decision.risk_level,
+                matched_rule=decision.matched_rule,
+                approval_id=plan.approval_id,
+                capability_risks=capability_risks,
+                payload={"result": result},
             )
         )
         return result
@@ -143,12 +187,29 @@ class AgentInterceptor:
         return self.evaluate(self.plan(request))
 
     def plan(self, request: InterceptionRequest) -> ExecutionPlan:
-        return ExecutionPlan(
+        request.context.ensure_trace_id()
+        plan = ExecutionPlan(
             context=request.context,
             tool_registry=request.tool_registry,
             approval_id=request.approval_id,
             dry_run=request.dry_run,
         )
+        self.audit_logger.log(
+            RuntimeEvent.audit_event(
+                event_type="plan",
+                decision="pending",
+                reason="Execution plan created",
+                stage="tool",
+                context=request.context,
+                approval_id=request.approval_id,
+                capability_risks=self._capability_risks_for_tool(request.context.tool_name),
+                payload={
+                    "dry_run": request.dry_run,
+                    "tool_name": request.context.tool_name,
+                },
+            )
+        )
+        return plan
 
     def evaluate(self, plan: ExecutionPlan) -> DecisionTrace:
         context = plan.context
@@ -173,6 +234,26 @@ class AgentInterceptor:
                 capability_metadata=capability_metadata,
             )
             plan.trace = trace
+            self.audit_logger.log(
+                RuntimeEvent.audit_event(
+                    event_type="decision",
+                    decision="blocked",
+                    reason=capability_reason,
+                    stage="tool",
+                    context=context,
+                    risk_level="medium",
+                    matched_rule="capability_gate",
+                    approval_id=plan.approval_id,
+                    capability_risks=capability_metadata and {
+                        name: definition.risk for name, definition in capability_metadata.items()
+                    },
+                    payload={
+                        "capability_result": trace.capability_result,
+                        "policy_result": trace.policy_result,
+                        "reason_chain": reason_chain,
+                    },
+                )
+            )
             return trace
 
         capability_result = "not_applicable" if context.allowed_capabilities is None else "allowed"
@@ -210,6 +291,27 @@ class AgentInterceptor:
             policy_decision=decision,
         )
         plan.trace = trace
+        self.audit_logger.log(
+            RuntimeEvent.audit_event(
+                event_type="decision",
+                decision=trace.final_decision,
+                reason=decision.reason,
+                stage="tool",
+                context=context,
+                risk_level=decision.risk_level,
+                matched_rule=decision.matched_rule,
+                approval_id=plan.approval_id,
+                capability_risks=capability_metadata and {
+                    name: definition.risk for name, definition in capability_metadata.items()
+                },
+                payload={
+                    "capability_result": trace.capability_result,
+                    "policy_result": trace.policy_result,
+                    "reason_chain": reason_chain,
+                    "requires_approval": decision.requires_approval,
+                },
+            )
+        )
         return trace
 
     def _evaluate_policy(
@@ -251,6 +353,14 @@ class AgentInterceptor:
                     f"Capability {capability_name}{risk_suffix} governs access to {tool_name}"
                 )
         return reasons
+
+    def _capability_risks_for_tool(self, tool_name: str | None) -> dict[str, str | None] | None:
+        if tool_name is None:
+            return None
+        metadata = self.capability_registry.metadata_for_tool(tool_name)
+        if not metadata:
+            return None
+        return {name: definition.risk for name, definition in metadata.items()}
 
     def execute(
         self,

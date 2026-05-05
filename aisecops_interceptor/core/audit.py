@@ -4,9 +4,13 @@ import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterable
+from uuid import uuid4
 
 from aisecops_interceptor.core.event_sink import EventSink, FileEventSink, InMemoryEventSink
 from aisecops_interceptor.core.events import RuntimeEvent
+
+
+DEFAULT_AUDIT_LOG_PATH = "logs/audit.jsonl"
 
 
 @dataclass(slots=True)
@@ -72,7 +76,17 @@ class AuditLogger:
         self._sink_failures.append(failure)
         self._persist_sink_failure(failure)
 
+    @staticmethod
+    def _ensure_trace_id(event: RuntimeEvent) -> None:
+        if event.trace_id is not None:
+            return
+        if event.context is not None:
+            event.trace_id = event.context.ensure_trace_id()
+            return
+        event.trace_id = uuid4().hex
+
     def log(self, event: RuntimeEvent) -> None:
+        self._ensure_trace_id(event)
         for sink in self.sinks:
             try:
                 sink.emit(event)

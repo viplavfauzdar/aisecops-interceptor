@@ -72,9 +72,8 @@ def test_missing_capability_blocks_tool_execution() -> None:
         assert "requires one of the granted capabilities" in str(exc)
 
     events = list(interceptor.audit_logger.events())
-    assert len(events) == 1
-    assert events[0].event_type == "tool_blocked"
-    assert events[0].matched_rule == "capability_gate"
+    assert [event.event_type for event in events] == ["plan", "decision", "tool_call", "tool_blocked"]
+    assert events[-1].matched_rule == "capability_gate"
 
 
 def test_capability_block_happens_before_policy_evaluation() -> None:

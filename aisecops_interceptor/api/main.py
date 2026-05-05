@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from aisecops_interceptor.core.approval import ApprovalStore
-from aisecops_interceptor.core.audit import AuditLogger
+from aisecops_interceptor.core.audit import AuditLogger, DEFAULT_AUDIT_LOG_PATH
 from aisecops_interceptor.core.capability_registry import CapabilityRegistry
 from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.exceptions import ApprovalRequiredError, PolicyViolationError, ToolNotFoundError
@@ -24,7 +24,7 @@ from aisecops_interceptor.integrations.openclaw_adapter import OpenClawToolRunne
 
 app = FastAPI(title="AISecOps Interceptor", version="0.3.0")
 policy = PolicyEngine.from_yaml_file()
-audit = AuditLogger(log_path="audit/audit.jsonl")
+audit = AuditLogger(log_path=DEFAULT_AUDIT_LOG_PATH)
 approvals = ApprovalStore(store_path="audit/approvals.jsonl")
 capabilities = CapabilityRegistry.from_yaml()
 interceptor = AgentInterceptor(

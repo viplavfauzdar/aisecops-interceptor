@@ -34,9 +34,10 @@ def test_pipeline_allows_safe_input_and_output_with_runtime_context() -> None:
     response = asyncio.run(pipeline.chat(request, context=context))
 
     assert response.content == "Safe response"
-    assert [event.event_type for event in events] == ["prompt_allowed", "output_allowed"]
+    assert [event.event_type for event in events] == ["user_input", "prompt_allowed", "output_allowed", "final_output"]
     assert all(isinstance(event, RuntimeEvent) for event in events)
     assert all(event.context is context for event in events)
+    assert len({event.trace_id for event in events}) == 1
 
 
 def test_pipeline_blocks_prompt_injection() -> None:
@@ -63,10 +64,10 @@ def test_pipeline_blocks_prompt_injection_with_runtime_context() -> None:
         asyncio.run(pipeline.chat(request, context=context))
 
     assert exc.value.stage == "input"
-    assert [event.event_type for event in events] == ["prompt_blocked"]
-    assert events[0].decision == "blocked"
-    assert isinstance(events[0], RuntimeEvent)
-    assert events[0].context is context
+    assert [event.event_type for event in events] == ["user_input", "prompt_blocked"]
+    assert events[1].decision == "blocked"
+    assert isinstance(events[1], RuntimeEvent)
+    assert events[1].context is context
 
 
 def test_pipeline_blocks_secret_like_output() -> None:
@@ -89,10 +90,10 @@ def test_pipeline_blocks_secret_like_output_with_runtime_context() -> None:
         asyncio.run(pipeline.chat(request, context=context))
 
     assert exc.value.stage == "output"
-    assert [event.event_type for event in events] == ["prompt_allowed", "output_blocked"]
-    assert events[1].decision == "blocked"
-    assert isinstance(events[1], RuntimeEvent)
-    assert events[1].context is context
+    assert [event.event_type for event in events] == ["user_input", "prompt_allowed", "output_blocked"]
+    assert events[2].decision == "blocked"
+    assert isinstance(events[2], RuntimeEvent)
+    assert events[2].context is context
 
 
 def test_pipeline_events_can_be_persisted_and_read_back(tmp_path) -> None:
@@ -105,6 +106,7 @@ def test_pipeline_events_can_be_persisted_and_read_back(tmp_path) -> None:
 
     assert response.content == "Safe response"
     persisted = list(logger.persisted_events())
-    assert [event.event_type for event in persisted] == ["prompt_allowed", "output_allowed"]
+    assert [event.event_type for event in persisted] == ["user_input", "prompt_allowed", "output_allowed", "final_output"]
     assert all(isinstance(event, RuntimeEvent) for event in persisted)
     assert persisted[0].context is not None
+    assert all(event.trace_id == persisted[0].trace_id for event in persisted)

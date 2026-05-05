@@ -7,11 +7,24 @@ from typing import Any
 from aisecops_interceptor.core.context import RuntimeContext
 
 
+def _sanitize_payload(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {str(key): _sanitize_payload(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_sanitize_payload(item) for item in value]
+    return str(value)
+
+
 @dataclass(slots=True)
 class RuntimeEvent:
     timestamp: str
     event_type: str
     decision: str
+    schema_version: str = "1.0"
+    trace_id: str | None = None
+    audit_kind: str | None = None
     reason: str | None = None
     stage: str | None = None
     context: RuntimeContext | None = None
@@ -27,6 +40,9 @@ class RuntimeEvent:
     risk_level: str = "low"
     matched_rule: str | None = None
     approval_id: str | None = None
+    capabilities: list[str] | None = None
+    capability_risks: dict[str, str | None] | None = None
+    payload: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -52,6 +68,9 @@ class RuntimeEvent:
                 timestamp=str(data["timestamp"]),
                 event_type=event_type,
                 decision=decision,
+                schema_version=str(data.get("schema_version") or "1.0"),
+                trace_id=str(data["trace_id"]) if data.get("trace_id") is not None else None,
+                audit_kind=str(data["audit_kind"]) if data.get("audit_kind") is not None else None,
                 reason=reason,
                 stage="tool",
                 context=context,
@@ -69,12 +88,22 @@ class RuntimeEvent:
                 risk_level=str(data.get("risk_level") or "low"),
                 matched_rule=str(data["matched_rule"]) if data.get("matched_rule") is not None else None,
                 approval_id=str(data["approval_id"]) if data.get("approval_id") is not None else None,
+                capabilities=list(data["capabilities"]) if isinstance(data.get("capabilities"), list) else None,
+                capability_risks=(
+                    {str(key): (str(value) if value is not None else None) for key, value in data["capability_risks"].items()}
+                    if isinstance(data.get("capability_risks"), dict)
+                    else None
+                ),
+                payload=dict(data["payload"]) if isinstance(data.get("payload"), dict) else None,
             )
 
         return cls(
             timestamp=str(data["timestamp"]),
             event_type=str(data["event_type"]),
             decision=str(data["decision"]),
+            schema_version=str(data.get("schema_version") or "1.0"),
+            trace_id=str(data["trace_id"]) if data.get("trace_id") is not None else None,
+            audit_kind=str(data["audit_kind"]) if data.get("audit_kind") is not None else None,
             reason=str(data["reason"]) if data.get("reason") is not None else None,
             stage=str(data["stage"]) if data.get("stage") is not None else None,
             context=context,
@@ -92,6 +121,13 @@ class RuntimeEvent:
             risk_level=str(data.get("risk_level") or "low"),
             matched_rule=str(data["matched_rule"]) if data.get("matched_rule") is not None else None,
             approval_id=str(data["approval_id"]) if data.get("approval_id") is not None else None,
+            capabilities=list(data["capabilities"]) if isinstance(data.get("capabilities"), list) else None,
+            capability_risks=(
+                {str(key): (str(value) if value is not None else None) for key, value in data["capability_risks"].items()}
+                if isinstance(data.get("capability_risks"), dict)
+                else None
+            ),
+            payload=dict(data["payload"]) if isinstance(data.get("payload"), dict) else None,
         )
 
     @classmethod
@@ -106,6 +142,7 @@ class RuntimeEvent:
         actor: str | None = None,
         environment: str = "dev",
         session_id: str | None = None,
+        trace_id: str | None = None,
         correlation_id: str | None = None,
         allowed: bool | None = None,
         reason: str | None = None,
@@ -115,11 +152,17 @@ class RuntimeEvent:
         approval_id: str | None = None,
         stage: str | None = None,
         context: RuntimeContext | None = None,
+        audit_kind: str | None = None,
+        capabilities: list[str] | None = None,
+        capability_risks: dict[str, str | None] | None = None,
+        payload: dict[str, Any] | None = None,
     ) -> "RuntimeEvent":
         return cls(
             timestamp=datetime.now(timezone.utc).isoformat(),
             event_type=event_type,
             decision=decision,
+            trace_id=trace_id,
+            audit_kind=audit_kind,
             reason=reason,
             stage=stage,
             context=context,
@@ -135,6 +178,9 @@ class RuntimeEvent:
             risk_level=risk_level,
             matched_rule=matched_rule,
             approval_id=approval_id,
+            capabilities=capabilities,
+            capability_risks=capability_risks,
+            payload=_sanitize_payload(payload) if payload is not None else None,
         )
 
     @classmethod
@@ -149,6 +195,9 @@ class RuntimeEvent:
         risk_level: str = "low",
         matched_rule: str | None = None,
         approval_id: str | None = None,
+        audit_kind: str | None = None,
+        capability_risks: dict[str, str | None] | None = None,
+        payload: dict[str, Any] | None = None,
     ) -> "RuntimeEvent":
         return cls.create(
             event_type=event_type,
@@ -161,6 +210,7 @@ class RuntimeEvent:
             actor=context.actor,
             environment=context.environment,
             session_id=context.session_id,
+            trace_id=context.trace_id,
             correlation_id=context.correlation_id,
             allowed=allowed,
             reason=reason,
@@ -168,6 +218,10 @@ class RuntimeEvent:
             risk_level=risk_level,
             matched_rule=matched_rule,
             approval_id=approval_id,
+            audit_kind=audit_kind,
+            capabilities=list(context.allowed_capabilities) if context.allowed_capabilities is not None else None,
+            capability_risks=capability_risks,
+            payload=payload,
         )
 
     @classmethod
@@ -179,6 +233,9 @@ class RuntimeEvent:
         reason: str | None = None,
         stage: str | None = None,
         context: RuntimeContext | None = None,
+        trace_id: str | None = None,
+        audit_kind: str | None = None,
+        payload: dict[str, Any] | None = None,
     ) -> "RuntimeEvent":
         return cls.create(
             event_type=event_type,
@@ -191,8 +248,58 @@ class RuntimeEvent:
             actor=context.actor if context else None,
             environment=context.environment if context else "dev",
             session_id=context.session_id if context else None,
+            trace_id=context.trace_id if context else trace_id,
             correlation_id=context.correlation_id if context else None,
-            allowed=(decision == "allowed"),
+            allowed=((decision == "allowed") if decision in {"allowed", "blocked"} else None),
             reason=reason,
             arguments=context.arguments if context else None,
+            audit_kind=audit_kind,
+            capabilities=list(context.allowed_capabilities) if context and context.allowed_capabilities is not None else None,
+            payload=payload,
+        )
+
+    @classmethod
+    def audit_event(
+        cls,
+        *,
+        event_type: str,
+        decision: str,
+        reason: str | None = None,
+        stage: str | None = None,
+        context: RuntimeContext | None = None,
+        trace_id: str | None = None,
+        risk_level: str = "low",
+        matched_rule: str | None = None,
+        approval_id: str | None = None,
+        capabilities: list[str] | None = None,
+        capability_risks: dict[str, str | None] | None = None,
+        payload: dict[str, Any] | None = None,
+    ) -> "RuntimeEvent":
+        return cls.create(
+            event_type=event_type,
+            decision=decision,
+            reason=reason,
+            stage=stage,
+            context=context,
+            agent_name=context.agent_name if context else "",
+            tool_name=context.tool_name if context else None,
+            framework=context.framework if context else "custom",
+            actor=context.actor if context else None,
+            environment=context.environment if context else "dev",
+            session_id=context.session_id if context else None,
+            trace_id=context.trace_id if context else trace_id,
+            correlation_id=context.correlation_id if context else None,
+            allowed=None,
+            arguments=context.arguments if context else None,
+            risk_level=risk_level,
+            matched_rule=matched_rule,
+            approval_id=approval_id,
+            audit_kind=event_type,
+            capabilities=(
+                capabilities
+                if capabilities is not None
+                else (list(context.allowed_capabilities) if context and context.allowed_capabilities is not None else None)
+            ),
+            capability_risks=capability_risks,
+            payload=payload,
         )
