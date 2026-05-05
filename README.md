@@ -83,6 +83,19 @@ if trace.final_decision == "allowed":
     result = interceptor.execute_plan(plan)
 ```
 
+### 3. Optional Local Guard Hook
+```python
+from aisecops_interceptor.edge.local_guard import inspect as local_guard_inspect
+from aisecops_interceptor.llm.pipeline import GuardedLLMPipeline
+
+pipeline = GuardedLLMPipeline(
+    client=llm_client,
+    pre_llm_hook=local_guard_inspect,
+)
+```
+
+This hook is opt-in. When enabled, it runs a lightweight prompt-injection and dangerous-pattern pre-check before the main guarded LLM pipeline.
+
 ## What AISecOps Interceptor Is
 
 AISecOps Interceptor is to AI agents what application security middleware is to web apps: a **framework‑agnostic runtime security layer** that sits between an agent runtime and the tools, APIs, or actions it wants to execute.
@@ -666,6 +679,9 @@ aisecops_interceptor/
     decision.py
     execution.py
     events.py
+
+  edge/
+    local_guard.py
 
   guard/
     detectors.py
