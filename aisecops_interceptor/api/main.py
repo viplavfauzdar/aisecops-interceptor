@@ -420,7 +420,7 @@ def execute(request: ExecuteRequest = Body(..., openapi_examples=EXECUTE_REQUEST
     if request.tool_name not in tool_registry:
         return _tool_not_found_response(request.tool_name)
 
-    trace = interceptor.explain(
+    plan = interceptor.plan(
         InterceptionRequest(
             context=interceptor_context_from_request(request),
             tool_registry=tool_registry,
@@ -428,14 +428,9 @@ def execute(request: ExecuteRequest = Body(..., openapi_examples=EXECUTE_REQUEST
             dry_run=request.dry_run,
         )
     )
+    trace = interceptor.evaluate(plan)
     try:
-        result = interceptor.execute(
-            agent_name=request.agent_name,
-            tool_call=ToolCall(name=request.tool_name, arguments=request.arguments),
-            tool_registry=tool_registry,
-            approval_id=request.approval_id,
-            dry_run=request.dry_run,
-        )
+        result = interceptor.execute_plan(plan)
         if request.dry_run:
             decision = "require_approval" if result.would_require_approval else ("block" if result.would_block else "allow")
             return APIResponse(

@@ -7,12 +7,11 @@ from aisecops_interceptor.core.approval import ApprovalStore
 from aisecops_interceptor.core.audit import AuditLogger
 from aisecops_interceptor.core.capability_registry import CapabilityRegistry
 from aisecops_interceptor.core.context import RuntimeContext
+from aisecops_interceptor.core.executor import PlanExecutor
 from aisecops_interceptor.core.events import RuntimeEvent
 from aisecops_interceptor.core.exceptions import ApprovalRequiredError, PolicyViolationError, ToolNotFoundError
-from aisecops_interceptor.core.models import DecisionTrace, DryRunResult, InterceptionRequest, ToolCall
+from aisecops_interceptor.core.models import DecisionTrace, DryRunResult, ExecutionPlan, InterceptionRequest, ToolCall
 from aisecops_interceptor.core.policy import PolicyEngine
-from aisecops_interceptor.core.decision import DecisionResult, DecisionType
-from aisecops_interceptor.core.execution import ExecutionGate
 
 
 class AgentInterceptor:
@@ -28,12 +27,17 @@ class AgentInterceptor:
         self.audit_logger = audit_logger
         self.approval_store = approval_store or ApprovalStore()
         self.capability_registry = capability_registry or CapabilityRegistry()
-        self.execution_gate = ExecutionGate()
+        self.executor = PlanExecutor()
 
     def intercept(self, request: InterceptionRequest) -> Any:
-        context = request.context
+        plan = self.plan(request)
+        self.evaluate(plan)
+        return self.execute_plan(plan)
+
+    def execute_plan(self, plan: ExecutionPlan) -> Any:
+        context = plan.context
         tool_call = context.to_tool_call()
-        trace = self.explain(request)
+        trace = plan.trace or self.evaluate(plan)
         if trace.capability_result == "blocked":
             self.audit_logger.log(
                 RuntimeEvent.tool_event(
@@ -44,10 +48,10 @@ class AgentInterceptor:
                     reason=trace.capability_reason,
                     risk_level="medium",
                     matched_rule="capability_gate",
-                    approval_id=request.approval_id,
+                    approval_id=plan.approval_id,
                 )
             )
-            if request.dry_run:
+            if plan.dry_run:
                 return DryRunResult(
                     would_allow=False,
                     would_block=True,
@@ -60,7 +64,7 @@ class AgentInterceptor:
         if decision is None:
             raise PolicyViolationError("Policy evaluation did not return a decision")
 
-        if decision.requires_approval and not self.approval_store.is_approved(request.approval_id):
+        if decision.requires_approval and not self.approval_store.is_approved(plan.approval_id):
             approval_request = self.approval_store.create_request(
                 agent_name=context.agent_name,
                 tool_call=tool_call,
@@ -79,7 +83,7 @@ class AgentInterceptor:
                     approval_id=approval_request.approval_id,
                 )
             )
-            if request.dry_run:
+            if plan.dry_run:
                 return DryRunResult(
                     would_allow=False,
                     would_block=False,
@@ -88,7 +92,7 @@ class AgentInterceptor:
                 )
             raise ApprovalRequiredError(decision.reason, approval_id=approval_request.approval_id)
 
-        approved = self.approval_store.is_approved(request.approval_id)
+        approved = self.approval_store.is_approved(plan.approval_id)
         self.audit_logger.log(
             RuntimeEvent.tool_event(
                 event_type="tool_allowed" if (decision.allowed or approved) else "tool_blocked",
@@ -98,12 +102,12 @@ class AgentInterceptor:
                 reason=(f"{decision.reason} (approved)" if approved and decision.requires_approval else decision.reason),
                 risk_level=decision.risk_level,
                 matched_rule=decision.matched_rule,
-                approval_id=request.approval_id,
+                approval_id=plan.approval_id,
             )
         )
 
         if not decision.allowed and not (decision.requires_approval and approved):
-            if request.dry_run:
+            if plan.dry_run:
                 return DryRunResult(
                     would_allow=False,
                     would_block=True,
@@ -112,7 +116,7 @@ class AgentInterceptor:
                 )
             raise PolicyViolationError(decision.reason)
 
-        if request.dry_run:
+        if plan.dry_run:
             return DryRunResult(
                 would_allow=True,
                 would_block=False,
@@ -120,24 +124,7 @@ class AgentInterceptor:
                 reason=(f"{decision.reason} (approved)" if approved and decision.requires_approval else decision.reason),
             )
 
-        tool = request.tool_registry.get(context.tool_name)
-        if tool is None:
-            raise ToolNotFoundError(f"Tool '{context.tool_name}' not found")
-
-        decision_result = DecisionResult(
-            decision=(
-                DecisionType.ALLOW
-                if (decision.allowed or approved)
-                else DecisionType.BLOCK
-            ),
-            reason=decision.reason,
-        )
-
-        result = self.execution_gate.execute(
-            decision_result,
-            tool,
-            **context.arguments,
-        )
+        result = self.executor.run(plan)
         self.audit_logger.log(
             RuntimeEvent.tool_event(
                 event_type="tool_executed",
@@ -147,13 +134,24 @@ class AgentInterceptor:
                 reason="Tool executed",
                 risk_level=decision.risk_level,
                 matched_rule=decision.matched_rule,
-                approval_id=request.approval_id,
+                approval_id=plan.approval_id,
             )
         )
         return result
 
     def explain(self, request: InterceptionRequest) -> DecisionTrace:
-        context = request.context
+        return self.evaluate(self.plan(request))
+
+    def plan(self, request: InterceptionRequest) -> ExecutionPlan:
+        return ExecutionPlan(
+            context=request.context,
+            tool_registry=request.tool_registry,
+            approval_id=request.approval_id,
+            dry_run=request.dry_run,
+        )
+
+    def evaluate(self, plan: ExecutionPlan) -> DecisionTrace:
+        context = plan.context
         tool_call = context.to_tool_call()
         reason_chain: list[str] = []
         capability_metadata = (
@@ -165,7 +163,7 @@ class AgentInterceptor:
         capability_reason = self._capability_denial_reason(context)
         if capability_reason is not None:
             reason_chain.append(capability_reason)
-            return DecisionTrace(
+            trace = DecisionTrace(
                 decision="blocked",
                 reason_chain=reason_chain,
                 capability_result="blocked",
@@ -174,6 +172,8 @@ class AgentInterceptor:
                 capability_reason=capability_reason,
                 capability_metadata=capability_metadata,
             )
+            plan.trace = trace
+            return trace
 
         capability_result = "not_applicable" if context.allowed_capabilities is None else "allowed"
         if capability_result == "not_applicable":
@@ -196,10 +196,10 @@ class AgentInterceptor:
                     f"Capability gate allowed tool '{context.tool_name}' for the granted capabilities"
                 )
 
-        decision = self.evaluate(agent_name=context.agent_name, tool_call=tool_call, context=context)
+        decision = self._evaluate_policy(agent_name=context.agent_name, tool_call=tool_call, context=context)
         policy_result = "require_approval" if decision.requires_approval else ("allowed" if decision.allowed else "blocked")
         reason_chain.append(decision.reason)
-        return DecisionTrace(
+        trace = DecisionTrace(
             decision=policy_result,
             reason_chain=reason_chain,
             capability_result=capability_result,
@@ -209,8 +209,10 @@ class AgentInterceptor:
             policy_reason=decision.reason,
             policy_decision=decision,
         )
+        plan.trace = trace
+        return trace
 
-    def evaluate(
+    def _evaluate_policy(
         self,
         *,
         agent_name: str,

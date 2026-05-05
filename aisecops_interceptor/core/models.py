@@ -24,6 +24,15 @@ class InterceptionRequest:
 
 
 @dataclass(slots=True)
+class ExecutionPlan:
+    context: RuntimeContext
+    tool_registry: dict[str, Callable[..., Any]]
+    approval_id: str | None = None
+    dry_run: bool = False
+    trace: DecisionTrace | None = None
+
+
+@dataclass(slots=True)
 class PolicyDecision:
     allowed: bool
     reason: str
