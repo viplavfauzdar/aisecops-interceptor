@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from aisecops_interceptor.core.approval import ApprovalStore
-from aisecops_interceptor.core.audit import AuditLogger
+from aisecops_interceptor.core.audit import AuditLogger, DEFAULT_AUDIT_LOG_PATH
 from aisecops_interceptor.core.capability_registry import CapabilityRegistry
 from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.exceptions import ApprovalRequiredError, PolicyViolationError, ToolNotFoundError
@@ -24,7 +24,7 @@ from aisecops_interceptor.integrations.openclaw_adapter import OpenClawToolRunne
 
 app = FastAPI(title="AISecOps Interceptor", version="0.3.0")
 policy = PolicyEngine.from_yaml_file()
-audit = AuditLogger(log_path="audit/audit.jsonl")
+audit = AuditLogger(log_path=DEFAULT_AUDIT_LOG_PATH)
 approvals = ApprovalStore(store_path="audit/approvals.jsonl")
 capabilities = CapabilityRegistry.from_yaml()
 interceptor = AgentInterceptor(
@@ -420,7 +420,7 @@ def execute(request: ExecuteRequest = Body(..., openapi_examples=EXECUTE_REQUEST
     if request.tool_name not in tool_registry:
         return _tool_not_found_response(request.tool_name)
 
-    trace = interceptor.explain(
+    plan = interceptor.plan(
         InterceptionRequest(
             context=interceptor_context_from_request(request),
             tool_registry=tool_registry,
@@ -428,14 +428,9 @@ def execute(request: ExecuteRequest = Body(..., openapi_examples=EXECUTE_REQUEST
             dry_run=request.dry_run,
         )
     )
+    trace = interceptor.evaluate(plan)
     try:
-        result = interceptor.execute(
-            agent_name=request.agent_name,
-            tool_call=ToolCall(name=request.tool_name, arguments=request.arguments),
-            tool_registry=tool_registry,
-            approval_id=request.approval_id,
-            dry_run=request.dry_run,
-        )
+        result = interceptor.execute_plan(plan)
         if request.dry_run:
             decision = "require_approval" if result.would_require_approval else ("block" if result.would_block else "allow")
             return APIResponse(

@@ -49,6 +49,29 @@ def test_log_path_persistence_behavior_is_unchanged(tmp_path) -> None:
     assert [item.event_type for item in logger.persisted_events()] == ["tool_executed"]
 
 
+def test_audit_logger_assigns_trace_id_and_persists_unified_schema(tmp_path) -> None:
+    logger = AuditLogger(log_path=str(tmp_path / "runtime-events.jsonl"))
+    context = RuntimeContext(agent_name="demo-agent", tool_name="read_customer")
+
+    logger.log(
+        RuntimeEvent.audit_event(
+            event_type="plan",
+            decision="pending",
+            reason="Execution plan created",
+            stage="tool",
+            context=context,
+            payload={"dry_run": False},
+        )
+    )
+
+    persisted = list(logger.persisted_events())
+    assert len(persisted) == 1
+    assert persisted[0].schema_version == "1.0"
+    assert persisted[0].trace_id is not None
+    assert persisted[0].audit_kind == "plan"
+    assert persisted[0].payload == {"dry_run": False}
+
+
 def test_webhook_event_sink_posts_runtime_event_json() -> None:
     sink = WebhookEventSink("https://example.com/webhook", timeout=2.5)
     context = RuntimeContext(agent_name="demo-agent", tool_name="read_customer")

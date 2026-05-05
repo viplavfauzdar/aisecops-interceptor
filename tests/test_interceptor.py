@@ -118,9 +118,10 @@ def test_intercept_supports_runtime_context_contract() -> None:
     result = interceptor.intercept(request)
     assert result == {"customer_id": "456"}
     events = list(interceptor.audit_logger.events())
-    assert len(events) == 2
+    assert len(events) == 6
     assert all(isinstance(event, RuntimeEvent) for event in events)
-    assert [event.event_type for event in events] == ["tool_allowed", "tool_executed"]
+    assert [event.event_type for event in events] == ["plan", "decision", "tool_call", "tool_allowed", "tool_executed", "final_output"]
+    assert len({event.trace_id for event in events}) == 1
 
 
 def test_intercept_blocks_high_sensitivity_context_end_to_end() -> None:
@@ -144,9 +145,9 @@ def test_intercept_blocks_high_sensitivity_context_end_to_end() -> None:
     except PolicyViolationError as exc:
         assert "Sensitivity level 'high' is blocked by policy" in str(exc)
     events = list(interceptor.audit_logger.events())
-    assert len(events) == 1
+    assert len(events) == 4
     assert isinstance(events[0], RuntimeEvent)
-    assert events[0].event_type == "tool_blocked"
+    assert [event.event_type for event in events] == ["plan", "decision", "tool_call", "tool_blocked"]
 
 
 def test_intercept_emits_approval_required_and_tool_executed_events() -> None:
@@ -163,7 +164,7 @@ def test_intercept_emits_approval_required_and_tool_executed_events() -> None:
         approval_id = exc.approval_id
 
     events = list(interceptor.audit_logger.events())
-    assert [event.event_type for event in events] == ["approval_required"]
+    assert [event.event_type for event in events] == ["plan", "decision", "tool_call", "approval_required"]
     assert all(isinstance(event, RuntimeEvent) for event in events)
 
     interceptor.approval_store.approve(approval_id, reviewed_by="reviewer")
@@ -176,9 +177,16 @@ def test_intercept_emits_approval_required_and_tool_executed_events() -> None:
 
     assert result == {"service": "orders", "status": "restarted"}
     assert [event.event_type for event in interceptor.audit_logger.events()] == [
+        "plan",
+        "decision",
+        "tool_call",
         "approval_required",
+        "plan",
+        "decision",
+        "tool_call",
         "tool_allowed",
         "tool_executed",
+        "final_output",
     ]
 
 
@@ -203,8 +211,9 @@ def test_runtime_events_are_persisted_and_read_back(tmp_path) -> None:
 
     assert result == {"customer_id": "123"}
     persisted = list(logger.persisted_events())
-    assert [event.event_type for event in persisted] == ["tool_allowed", "tool_executed"]
+    assert [event.event_type for event in persisted] == ["plan", "decision", "tool_call", "tool_allowed", "tool_executed", "final_output"]
     assert all(isinstance(event, RuntimeEvent) for event in persisted)
+    assert all(event.trace_id == persisted[0].trace_id for event in persisted)
 
 
 def test_high_risk_preset_requires_approval_end_to_end() -> None:
@@ -255,7 +264,7 @@ def test_dry_run_does_not_execute_tool_but_returns_allow_decision() -> None:
     assert result.would_block is False
     assert result.would_require_approval is False
     assert executed["called"] is False
-    assert [event.event_type for event in interceptor.audit_logger.events()] == ["tool_allowed"]
+    assert [event.event_type for event in interceptor.audit_logger.events()] == ["plan", "decision", "tool_call", "tool_allowed"]
 
 
 def test_dry_run_returns_approval_requirement_and_emits_event() -> None:
@@ -277,4 +286,4 @@ def test_dry_run_returns_approval_requirement_and_emits_event() -> None:
     assert result.would_allow is False
     assert result.would_block is False
     assert result.would_require_approval is True
-    assert [event.event_type for event in interceptor.audit_logger.events()] == ["approval_required"]
+    assert [event.event_type for event in interceptor.audit_logger.events()] == ["plan", "decision", "tool_call", "approval_required"]

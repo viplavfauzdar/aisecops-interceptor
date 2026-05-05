@@ -68,10 +68,33 @@ request = InterceptionRequest(
     },
 )
 
-# interceptor.intercept(...) capability-gates the request, then evaluates
-# allow / block / require_approval before the tool executes.
+# interceptor.intercept(...) remains the simplest end-to-end entrypoint.
 result = interceptor.intercept(request)
 ```
+
+If you need to separate decisioning from execution, the interceptor also exposes
+an explicit plan/evaluate/execute flow:
+
+```python
+plan = interceptor.plan(request)
+trace = interceptor.evaluate(plan)
+
+if trace.final_decision == "allowed":
+    result = interceptor.execute_plan(plan)
+```
+
+### 3. Optional Local Guard Hook
+```python
+from aisecops_interceptor.edge.local_guard import inspect as local_guard_inspect
+from aisecops_interceptor.llm.pipeline import GuardedLLMPipeline
+
+pipeline = GuardedLLMPipeline(
+    client=llm_client,
+    pre_llm_hook=local_guard_inspect,
+)
+```
+
+This hook is opt-in. When enabled, it runs a lightweight prompt-injection and dangerous-pattern pre-check before the main guarded LLM pipeline.
 
 ## What AISecOps Interceptor Is
 
@@ -81,6 +104,8 @@ It is designed for developers building agents that can call tools, trigger workf
 
 
 In practical terms, the interceptor sits between your **agent framework** and the **tools or APIs** the agent attempts to call. Every execution request passes through capability gating, policy evaluation, approval workflows, and audit logging before the action occurs.
+
+The runtime also supports a split decision flow for integrations that need to inspect a decision before executing a tool. `AgentInterceptor.plan(...)` creates an `ExecutionPlan`, `evaluate(...)` attaches the decision trace, and `execute_plan(...)` runs the already-evaluated plan through the execution gate.
 
 Release metadata:
 
@@ -394,10 +419,14 @@ D --> E[LLMResponse]
 ```
 
 `GuardedLLMPipeline.chat(...)` can optionally accept a `RuntimeContext` and propagate it through LLM guard checks.
-It can also emit structured LLM-stage security events (`prompt_allowed`, `prompt_blocked`, `output_allowed`, `output_blocked`) through the same runtime event model used by tool execution and audit logging.
+It can also emit structured LLM-stage security events (`user_input`, `prompt_allowed`, `prompt_blocked`, `output_allowed`, `output_blocked`, `final_output`) through the same runtime event model used by tool execution and audit logging.
 `RuntimeContext` also carries optional source and sensitivity metadata (`source`, `data_classification`, `sensitivity_level`) for downstream security workflows and policy decisions.
+For edge or local deployments, you can also pass an opt-in `pre_llm_hook` such as `aisecops_interceptor.edge.local_guard.inspect` to `GuardedLLMPipeline(...)` to run a lightweight prompt-injection and dangerous-pattern pre-check before the main guarded LLM flow. This hook is not enforced globally and only runs when explicitly configured.
 
 Runtime events can be persisted to JSONL and retrieved through the API for downstream analysis or audit review.
+The default API audit log path is `logs/audit.jsonl`.
+Each persisted event carries a generated `trace_id` and a unified schema with stable top-level fields such as `schema_version`, `event_type`, `decision`, `audit_kind`, `stage`, `risk_level`, `capabilities`, `capability_risks`, and `payload`.
+Tool-stage auditing now records plan creation, decision evaluation, tool-call receipt, allow/block-or-approval decisions, execution, and final output using that same schema.
 The `/audit` endpoint supports optional query parameters: `event_type`, `stage`, `agent_name`, `tool_name`, `correlation_id`, and `limit`.
 `AuditLogger` can also emit the same `RuntimeEvent` records to multiple sinks, such as JSONL persistence and additional in-memory or external streaming adapters.
 Supported sink types include file-backed JSONL persistence, in-memory collection, and webhook delivery to external HTTP endpoints.
@@ -642,6 +671,7 @@ aisecops_interceptor/
 
   core/
     interceptor.py
+    executor.py
     policy.py
     approval.py
     audit.py
@@ -649,6 +679,9 @@ aisecops_interceptor/
     decision.py
     execution.py
     events.py
+
+  edge/
+    local_guard.py
 
   guard/
     detectors.py
@@ -811,11 +844,13 @@ AISecOps Interceptor exposes two primary endpoints:
 
 ### POST /execute
 - Runs the full interception flow
+- Internally builds a reusable execution plan, evaluates it, then executes it
 - May execute the tool if allowed
 - May block or require approval
 
 ### POST /explain
 - Runs the same interception logic
+- Evaluates the same execution plan shape used by `/execute`
 - **Does NOT execute the tool**
 - Returns a structured decision trace
 
