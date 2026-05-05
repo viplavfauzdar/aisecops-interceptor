@@ -68,9 +68,19 @@ request = InterceptionRequest(
     },
 )
 
-# interceptor.intercept(...) capability-gates the request, then evaluates
-# allow / block / require_approval before the tool executes.
+# interceptor.intercept(...) remains the simplest end-to-end entrypoint.
 result = interceptor.intercept(request)
+```
+
+If you need to separate decisioning from execution, the interceptor also exposes
+an explicit plan/evaluate/execute flow:
+
+```python
+plan = interceptor.plan(request)
+trace = interceptor.evaluate(plan)
+
+if trace.final_decision == "allowed":
+    result = interceptor.execute_plan(plan)
 ```
 
 ## What AISecOps Interceptor Is
@@ -81,6 +91,8 @@ It is designed for developers building agents that can call tools, trigger workf
 
 
 In practical terms, the interceptor sits between your **agent framework** and the **tools or APIs** the agent attempts to call. Every execution request passes through capability gating, policy evaluation, approval workflows, and audit logging before the action occurs.
+
+The runtime also supports a split decision flow for integrations that need to inspect a decision before executing a tool. `AgentInterceptor.plan(...)` creates an `ExecutionPlan`, `evaluate(...)` attaches the decision trace, and `execute_plan(...)` runs the already-evaluated plan through the execution gate.
 
 Release metadata:
 
@@ -642,6 +654,7 @@ aisecops_interceptor/
 
   core/
     interceptor.py
+    executor.py
     policy.py
     approval.py
     audit.py
@@ -811,11 +824,13 @@ AISecOps Interceptor exposes two primary endpoints:
 
 ### POST /execute
 - Runs the full interception flow
+- Internally builds a reusable execution plan, evaluates it, then executes it
 - May execute the tool if allowed
 - May block or require approval
 
 ### POST /explain
 - Runs the same interception logic
+- Evaluates the same execution plan shape used by `/execute`
 - **Does NOT execute the tool**
 - Returns a structured decision trace
 
