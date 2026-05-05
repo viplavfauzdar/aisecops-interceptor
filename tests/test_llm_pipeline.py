@@ -1,6 +1,7 @@
 import asyncio
 import pytest
 
+from aisecops_interceptor.edge import local_guard
 from aisecops_interceptor.core.audit import AuditLogger
 from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.events import RuntimeEvent
@@ -50,6 +51,32 @@ def test_pipeline_blocks_prompt_injection() -> None:
         asyncio.run(pipeline.chat(request))
 
     assert exc.value.stage == "input"
+
+
+def test_pipeline_pre_llm_hook_is_opt_in() -> None:
+    pipeline = GuardedLLMPipeline(client=FakeLLMClient("Safe response"))
+    request = LLMRequest(messages=[LLMMessage(role="user", content="please drop table users")])
+
+    response = asyncio.run(pipeline.chat(request))
+
+    assert response.content == "Safe response"
+
+
+def test_pipeline_optional_pre_llm_hook_blocks_dangerous_input() -> None:
+    events = []
+    pipeline = GuardedLLMPipeline(
+        client=FakeLLMClient("Safe response"),
+        event_sink=events.append,
+        pre_llm_hook=local_guard.inspect,
+    )
+    request = LLMRequest(messages=[LLMMessage(role="user", content="please drop table users")])
+
+    with pytest.raises(LLMGuardViolationError) as exc:
+        asyncio.run(pipeline.chat(request))
+
+    assert exc.value.stage == "input"
+    assert [event.event_type for event in events] == ["user_input", "prompt_blocked"]
+    assert events[1].payload == {"source": "pre_llm_hook"}
 
 
 def test_pipeline_blocks_prompt_injection_with_runtime_context() -> None:

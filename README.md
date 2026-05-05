@@ -408,6 +408,7 @@ D --> E[LLMResponse]
 `GuardedLLMPipeline.chat(...)` can optionally accept a `RuntimeContext` and propagate it through LLM guard checks.
 It can also emit structured LLM-stage security events (`user_input`, `prompt_allowed`, `prompt_blocked`, `output_allowed`, `output_blocked`, `final_output`) through the same runtime event model used by tool execution and audit logging.
 `RuntimeContext` also carries optional source and sensitivity metadata (`source`, `data_classification`, `sensitivity_level`) for downstream security workflows and policy decisions.
+For edge or local deployments, you can also pass an opt-in `pre_llm_hook` such as `aisecops_interceptor.edge.local_guard.inspect` to `GuardedLLMPipeline(...)` to run a lightweight prompt-injection and dangerous-pattern pre-check before the main guarded LLM flow. This hook is not enforced globally and only runs when explicitly configured.
 
 Runtime events can be persisted to JSONL and retrieved through the API for downstream analysis or audit review.
 The default API audit log path is `logs/audit.jsonl`.

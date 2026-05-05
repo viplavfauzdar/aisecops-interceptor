@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from uuid import uuid4
 
 from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.events import RuntimeEvent
+from aisecops_interceptor.guard.models import GuardResult
 from aisecops_interceptor.guard.input_inspector import inspect_prompt
 from aisecops_interceptor.guard.output_inspector import inspect_output
 from aisecops_interceptor.llm.base import LLMClient
@@ -18,9 +20,16 @@ class LLMGuardViolationError(Exception):
 
 
 class GuardedLLMPipeline:
-    def __init__(self, *, client: LLMClient, event_sink: LLMEventSink | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        client: LLMClient,
+        event_sink: LLMEventSink | None = None,
+        pre_llm_hook: Callable[[str], GuardResult] | None = None,
+    ) -> None:
         self.client = client
         self.event_sink = event_sink
+        self.pre_llm_hook = pre_llm_hook
 
     def _emit_event(
         self,
@@ -64,6 +73,24 @@ class GuardedLLMPipeline:
                 "prompt": prompt_text,
             },
         )
+        if self.pre_llm_hook is not None:
+            precheck_result = self.pre_llm_hook(prompt_text)
+            if not precheck_result.allowed:
+                reason = (
+                    precheck_result.findings[0].message
+                    if precheck_result.findings
+                    else "Local pre-LLM hook blocked request"
+                )
+                self._emit_event(
+                    event_type="prompt_blocked",
+                    decision="blocked",
+                    reason=reason,
+                    stage="input",
+                    context=context,
+                    trace_id=trace_id,
+                    payload={"source": "pre_llm_hook"},
+                )
+                raise LLMGuardViolationError("input", reason)
         input_result = inspect_prompt(prompt_text)
         if not input_result.allowed:
             reason = input_result.findings[0].message if input_result.findings else "Input inspection blocked request"
