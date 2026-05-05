@@ -46,7 +46,7 @@ Changelog = "https://github.com/viplavfauzdar/aisecops-interceptor/blob/main/CHA
 
 [project.optional-dependencies]
 dev = [
-  "pytest==8.4.1",
+  "pytest==9.0.3",
 ]
 
 [tool.setuptools.packages.find]
