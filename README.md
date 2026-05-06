@@ -16,10 +16,12 @@
 - [Threat model](#threat-model)
 - [Security boundaries](#security-boundaries)
 - [Included capabilities](#included-capabilities)
+- [High-level architecture](#high-level-architecture)
+- [Hack the agent demo](#hack-the-agent-demo)
 - [Policy bundles](#policy-bundles)
 - [Repository layout](#repository-layout)
-- [Hack the agent demo](#hack-the-agent-demo)
 - [Full local quick start](#full-local-quick-start)
+- [API: Execute vs Explain](#api-execute-vs-explain)
 - [Architecture direction](#architecture-direction)
 
 AISecOps Interceptor provides a framework-agnostic control plane to detect prompt injections, prevent secret leakage, and enforce human-in-the-loop approvals before your agents execute dangerous tools.
@@ -154,13 +156,19 @@ User prompt → LLM → tool invocation → sensitive action
 
 ```text
 User prompt
+  → optional local / edge guard
   → prompt guard
   → guarded LLM pipeline
   → output guard
+  → runtime context builder
   → capability gate
-  → policy engine
-  → execution gate
+  → AISecOps interceptor
+  → plan
+  → evaluate
+  → decision
+  → executor
   → tool execution only if approved
+  → audit event
 ```
 
 Typical outcomes:
@@ -198,17 +206,31 @@ Sensitive action happens
 ```
 User prompt
    ↓
+Optional local / edge guard
+   ↓
 Prompt guard
    ↓
-LLM response inspection
+Guarded LLM pipeline
+   ↓
+Output guard
+   ↓
+Runtime context builder
    ↓
 Capability gate
    ↓
-Policy engine
+AISecOps interceptor
    ↓
-Execution gate
+Plan
+   ↓
+Evaluate
+   ↓
+Decision
+   ↓
+Executor
    ↓
 Tool runs only if approved
+   ↓
+Audit event
 ```
 
 AISecOps Interceptor acts as the **runtime security layer for agentic systems**.
@@ -289,15 +311,13 @@ Current implementation includes:
 
 ### Core runtime
 
-- Interceptor core
+- Interceptor core with explicit execution split: `plan` → `evaluate` → `execute`
 - Runtime context propagation
 - Capability-gated tool execution
-- Policy evaluation
-- Optional declarative rule engine
-- YAML policy bundles with validation
-- Decision engine + execution gate
-- Human approval workflow
-- Structured runtime event logging with JSONL persistence
+- Policy evaluation and human approval workflow
+- Dry-run mode for non-executing decision checks
+- Structured JSONL audit logging
+- YAML policy and capability bundles with validation
 - Optional multi-sink runtime event emission
 
 ### LLM security layer
@@ -306,6 +326,7 @@ Current implementation includes:
 - Guarded LLM pipeline
 - Prompt inspection
 - Output inspection
+- Optional local / edge pre-LLM guard hook
 
 ### Supported model providers
 
@@ -327,7 +348,7 @@ Current implementation includes:
 
 ---
 
-# High‑level architecture
+# High-level architecture
 
 At a high level, AISecOps Interceptor sits in the missing control plane layer between agent frameworks and real execution.
 
@@ -335,30 +356,24 @@ At a high level, AISecOps Interceptor sits in the missing control plane layer be
 flowchart TD
 
 A[Agent Runtime / Framework]
-
 A --> B[Framework Adapter]
-
 B --> C[Runtime Context Builder]
-
 C --> D[Capability Gate]
-
 D --> E[AISecOps Interceptor]
-
-E --> F[Decision Engine]
-
-F --> G[Execution Gate]
-
-G --> H[Tool / API Execution]
-
-H --> I[Audit Event]
+E --> F[Plan]
+F --> G[Evaluate]
+G --> H[Decision]
+H --> I[Executor]
+I --> J[Tool / API Execution]
+J --> K[Audit Event]
 ```
 
 This is the core execution path developers integrate with:
 
 - agent framework builds runtime context
 - capability gate checks granted capabilities against tool mappings
-- interceptor evaluates policy and rules
-- execution gate decides allow, block, or approval
+- interceptor plans, evaluates, and decides execution
+- executor runs the approved tool call or stops the request
 - runtime events are emitted to audit sinks
 - audit logger persists and distributes runtime events to configured sinks
 
@@ -382,20 +397,17 @@ This protects both prompt input and model output before tools are executed.
 flowchart TD
 
 A[Agent Prompt]
-
-A --> B[Prompt Guard]
-
-B --> C[Guarded LLM Pipeline]
-
-C --> D[LLM Provider]
-
-D --> E[Model Response]
-
-E --> F[Output Guard]
-
-F --> G[AISecOps Interceptor]
-
-G --> H[Tool Execution]
+A --> B[Optional Local / Edge Guard]
+B --> C[Prompt Guard]
+C --> D[Guarded LLM Pipeline]
+D --> E[LLM Provider]
+E --> F[Model Response]
+F --> G[Output Guard]
+G --> H[AISecOps Interceptor]
+H --> I[Plan]
+I --> J[Evaluate]
+J --> K[Executor]
+K --> L[Tool Execution]
 ```
 
 ---
@@ -743,26 +755,19 @@ This diagram shows the **complete runtime security flow** from prompt to tool ex
 flowchart TD
 
 A[User / Agent Prompt]
-
-A --> B[Prompt Guard]
-
-B --> C[Guarded LLM Pipeline]
-
-C --> D[Output Guard]
-
-D --> E[Runtime Context Builder]
-
-E --> F[Capability Gate]
-
-F --> G[AISecOps Interceptor]
-
-G --> H[Decision Engine]
-
-H --> I[Execution Gate]
-
-I --> J[Tool / API Execution]
-
-J --> K[Audit Event]
+A --> B[Optional Local / Edge Guard]
+B --> C[Prompt Guard]
+C --> D[Guarded LLM Pipeline]
+D --> E[Output Guard]
+E --> F[Runtime Context Builder]
+F --> G[Capability Gate]
+G --> H[AISecOps Interceptor]
+H --> I[Plan]
+I --> J[Evaluate]
+J --> K[Decision]
+K --> L[Executor]
+L --> M[Tool / API Execution]
+M --> N[Audit Event]
 ```
 
 This makes it clear that **both prompt-layer threats and tool-execution risks are governed by the AISecOps runtime**.
@@ -774,28 +779,18 @@ This full flow is what differentiates the interceptor from simple prompt filteri
 flowchart TD
 
 A[Agent Tool Request]
-
 A --> B[Runtime Context Builder]
-
 B --> C[Capability Gate]
-
 C --> D[AISecOps Interceptor]
-
-D --> E[Decision Engine]
-
-E --> F{Decision}
-
-F -->|Allow| G[Execution Gate]
-
-F -->|Block| H[Reject Request]
-
-F -->|Require Approval| I[Approval Workflow]
-
-I --> G
-
-G --> J[Tool / API Execution]
-
-J --> K[Audit Event]
+D --> E[Plan]
+E --> F[Evaluate]
+F --> G[Decision]
+G -->|Allow| H[Executor]
+G -->|Block| I[Reject]
+G -->|Require Approval| J[Approval]
+J --> H
+H --> K[Tool / API Execution]
+K --> L[Audit Event]
 ```
 
 This diagram shows the **tool-execution governance path** after prompt and output checks have already completed.
@@ -909,18 +904,9 @@ This endpoint is useful for:
 ## Minimal example
 
 For a working end‑to‑end example showing interception, policy evaluation, and tool execution control, run:
-For a working end‑to‑end example showing interception, policy evaluation, and tool execution control, run:
 
 ```bash
 python -m examples.agent_demo
-```
-
-Additional demos:
-
-```bash
-python -m examples.hack_the_agent_demo
-python -m examples.capabilities_demo
-python -m examples.policy_bundle_demo
 ```
 
 Additional demos:
@@ -952,7 +938,7 @@ Current tests validate:
 Latest verified local run:
 
 ```
-85/85 passed
+91/91 passed
 ```
 
 ---
@@ -1022,13 +1008,13 @@ The objective is a portable runtime capable of securing:
 
 Current state:
 
-Working runtime core + guarded large language model pipeline + interceptor enforcement + declarative policy engine + end-to-end demo coverage.
+Working runtime core + guarded large language model pipeline + optional local guard + explicit plan/evaluate/execute split + capability gate + declarative policy engine + structured JSONL audit logging + end-to-end demo coverage.
 
 Current engineering focus:
 
+- improve replay and debug workflows from structured JSONL events
 - expand declarative policy coverage while keeping fallback policy behavior simple
-- strengthen policy evaluation with richer runtime metadata
-- improve audit and event visibility across prompt and tool execution stages
+- strengthen explainability across capability, policy, approval, and execution decisions
 - keep adapters thin while improving real framework integrations
 
 ---
