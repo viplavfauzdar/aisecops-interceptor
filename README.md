@@ -495,20 +495,20 @@ See `scripts/record_instructions.md` for the QuickTime Player and `screencapture
 1) Prompt guard blocks the obvious jailbreak
 {'blocked_at': 'input', 'reason': 'Matched pattern: ignore previous instructions'}
 
-2) Capability gate blocks a dangerous tool plan
+2) Provenance-aware policy blocks an untrusted skill-driven action
+{'decision': 'block', 'matched_rule': 'rules[0]', 'reason': "Rule blocked tool 'send_email'", 'provenance': [...], 'plan': 'TOOL send_email to=vip@example.com subject=urgent body=send_now'}
+
+3) Capability gate blocks a dangerous tool plan
 {'blocked_by': 'capability_gate', 'reason': "Tool 'restart_service' requires one of the granted capabilities: cap_service_ops", 'plan': 'TOOL restart_service service=payments-api'}
 
-3) Policy still requires approval for privileged use
-{'approval_required': True, 'reason': "Rule requires approval for tool 'restart_service'", 'plan': 'TOOL restart_service service=payments-api'}
+4) Provenance-aware policy requires approval for privileged use
+{'decision': 'require_approval', 'matched_rule': 'rules[1]', 'reason': "Rule requires approval for tool 'restart_service'", 'provenance': [...], 'plan': 'TOOL restart_service service=payments-api'}
 
-4) Runtime event trail
-{'event_type': 'prompt_blocked', 'stage': 'input', 'decision': 'blocked', 'tool_name': None, 'reason': 'Matched pattern: ignore previous instructions'}
-{'event_type': 'prompt_allowed', 'stage': 'input', 'decision': 'allowed', 'tool_name': None, 'reason': 'Prompt allowed'}
-{'event_type': 'output_allowed', 'stage': 'output', 'decision': 'allowed', 'tool_name': None, 'reason': 'Output allowed'}
-{'event_type': 'tool_blocked', 'stage': 'tool', 'decision': 'blocked', 'tool_name': 'restart_service', 'reason': "Tool 'restart_service' requires one of the granted capabilities: cap_service_ops"}
-{'event_type': 'prompt_allowed', 'stage': 'input', 'decision': 'allowed', 'tool_name': None, 'reason': 'Prompt allowed'}
-{'event_type': 'output_allowed', 'stage': 'output', 'decision': 'allowed', 'tool_name': None, 'reason': 'Output allowed'}
-{'event_type': 'approval_required', 'stage': 'tool', 'decision': 'require_approval', 'tool_name': 'restart_service', 'reason': "Rule requires approval for tool 'restart_service'"}
+5) Runtime event trail
+{'event_type': 'user_input', 'stage': 'input', 'decision': 'observed', 'tool_name': None, 'reason': 'User input received', 'provenance': [...]}
+{'event_type': 'tool_blocked', 'stage': 'tool', 'decision': 'blocked', 'tool_name': 'send_email', 'reason': "Rule blocked tool 'send_email'", 'provenance': [...]}
+{'event_type': 'tool_blocked', 'stage': 'tool', 'decision': 'blocked', 'tool_name': 'restart_service', 'reason': "Tool 'restart_service' requires one of the granted capabilities: cap_service_ops", 'provenance': [...]}
+{'event_type': 'approval_required', 'stage': 'tool', 'decision': 'require_approval', 'tool_name': 'restart_service', 'reason': "Rule requires approval for tool 'restart_service'", 'provenance': [...]}
 ```
 
 Example output when the interceptor blocks a malicious agent attempt:
@@ -519,8 +519,9 @@ Example output when the interceptor blocks a malicious agent attempt:
 What it proves:
 
 - an obvious jailbreak prompt is blocked by the prompt guard before the model response can drive tool use
+- provenance-aware policy can block untrusted skill-driven actions before execution
 - a dangerous LLM-generated tool plan is blocked by the capability gate when the agent lacks the required capability
-- the same dangerous plan still hits approval requirements when the agent has the right capability but policy marks the tool as sensitive
+- the same dangerous plan still hits approval requirements when provenance or policy marks the tool path as sensitive
 
 ### Explain the same decision without executing tools
 
@@ -579,10 +580,12 @@ Configuration responsibilities are separated deliberately:
 
 Each rule supports:
 
-- `tool_name`
+- `tool_name` or `tool`
 - `agent_name` (optional)
 - `sensitivity_level` (optional)
-- `action`: `allow`, `block`, or `require_approval`
+- `provenance_trust` (optional list)
+- `provenance_source_type` (optional list)
+- `action` or `effect`: `allow`, `block` / `deny`, or `require_approval`
 
 If rules are provided, the first matching rule wins and overrides the default policy behavior. If no rule matches, the existing blocked-tool, dangerous-argument, allowlist, approval, and monitored-tool logic still applies. The current test suite covers allow, block, require-approval, and sensitivity-based rule evaluation.
 
@@ -638,7 +641,8 @@ Example:
 policy = PolicyEngine(
     {
         "rules": [
-            {"tool_name": "restart_service", "agent_name": "ops_agent", "action": "require_approval"},
+            {"tool": "send_email", "effect": "deny", "provenance_trust": ["external", "unverified"]},
+            {"tool_name": "restart_service", "provenance_source_type": ["skill"], "action": "require_approval"},
             {"tool_name": "read_customer", "sensitivity_level": "high", "action": "block"},
         ]
     }
@@ -657,8 +661,15 @@ Example bundle:
 
 ```yaml
 rules:
+  - tool: send_email
+    effect: deny
+    provenance_trust:
+      - external
+      - unverified
+
   - tool_name: restart_service
-    agent_name: ops_agent
+    provenance_source_type:
+      - skill
     action: require_approval
 
   - tool_name: read_customer
@@ -668,10 +679,12 @@ rules:
 
 Supported rule fields:
 
-- `tool_name` (required)
-- `action` (required): `allow`, `block`, or `require_approval`
+- `tool_name` or `tool` (optional when another matching condition is present)
+- `action` or `effect` (required): `allow`, `block` / `deny`, or `require_approval`
 - `agent_name` (optional)
 - `sensitivity_level` (optional)
+- `provenance_trust` (optional list)
+- `provenance_source_type` (optional list)
 
 Load a bundle with:
 
@@ -949,7 +962,7 @@ Current tests validate:
 Latest verified local run:
 
 ```
-91/91 passed
+101/101 passed
 ```
 
 ---
