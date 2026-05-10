@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.4.0
+
+### Added
+
+- Instruction provenance model for tracking where agent instructions originate.
+- Replay-friendly trace metadata for audit and future replay tooling.
+- Provenance attached to execution plans.
+- Provenance persisted in structured JSONL audit events.
+- Provenance-aware policy rules using `provenance_trust`.
+- Provenance-aware policy rules using `provenance_source_type`.
+- Hack-the-agent demo coverage for untrusted skill provenance.
+
+### Changed
+
+- Policy evaluation can now factor instruction origin and trust level into runtime decisions.
+- `hack_the_agent_demo` now demonstrates provenance-aware blocking and approval.
+- README updated with provenance-aware policy enforcement details.
+
+### Notes
+
+- Provenance matching is string-based.
+- Cryptographic signing and provenance authenticity verification are intentionally out of scope for this release.
+
 ## v0.2.0
 
 ### Added
