@@ -38,6 +38,8 @@ def test_execution_plan_accepts_provenance() -> None:
 
     assert plan.provenance == provenance
     assert plan.execution_plan_id
+    assert plan.has_provenance_trust("external") is True
+    assert plan.has_provenance_source_type("user_prompt") is True
 
 
 def test_audit_event_persists_provenance(tmp_path) -> None:

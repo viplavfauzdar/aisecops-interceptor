@@ -445,6 +445,11 @@ Tool-stage auditing now records plan creation, decision evaluation, tool-call re
 AISecOps records where instructions came from, such as prompts, skills, retrieved content, memory, or tool results.
 That provenance is included in replayable JSONL audit events, which prepares future replay and debug tooling without changing current enforcement behavior.
 
+### Provenance-aware policy enforcement
+
+AISecOps can evaluate instruction origin during policy enforcement.
+Policies may deny or escalate based on provenance trust or provenance source type, which is useful for malicious skills, retrieval poisoning, and multi-agent trust boundaries.
+
 The `/audit` endpoint supports optional query parameters: `event_type`, `stage`, `agent_name`, `tool_name`, `correlation_id`, and `limit`.
 `AuditLogger` can also emit the same `RuntimeEvent` records to multiple sinks, such as JSONL persistence and additional in-memory or external streaming adapters.
 Supported sink types include file-backed JSONL persistence, in-memory collection, and webhook delivery to external HTTP endpoints.

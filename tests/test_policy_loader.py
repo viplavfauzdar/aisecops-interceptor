@@ -11,9 +11,11 @@ def test_policy_loader_loads_valid_yaml(tmp_path) -> None:
         "\n".join(
             [
                 "rules:",
-                "  - tool_name: restart_service",
+                "  - tool: restart_service",
                 "    agent_name: ops_agent",
-                "    action: require_approval",
+                "    effect: require_approval",
+                "    provenance_source_type:",
+                "      - skill",
                 "",
                 "  - tool_name: read_customer",
                 "    sensitivity_level: high",
@@ -28,6 +30,7 @@ def test_policy_loader_loads_valid_yaml(tmp_path) -> None:
     assert len(bundle.rules) == 2
     assert bundle.rules[0].tool_name == "restart_service"
     assert bundle.rules[0].action == "require_approval"
+    assert bundle.rules[0].provenance_source_type == ("skill",)
     assert bundle.rules[1].sensitivity_level == "high"
 
 

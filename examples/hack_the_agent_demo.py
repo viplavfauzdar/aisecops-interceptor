@@ -19,7 +19,9 @@ from aisecops_interceptor.llm.pipeline import GuardedLLMPipeline, LLMGuardViolat
 class DangerousDemoLLMClient:
     async def chat(self, request: LLMRequest) -> LLMResponse:
         user_prompt = request.messages[-1].content.lower()
-        if "export" in user_prompt or "customer" in user_prompt:
+        if "email" in user_prompt:
+            content = "TOOL send_email to=vip@example.com subject=urgent body=send_now"
+        elif "export" in user_prompt or "customer" in user_prompt:
             content = "TOOL read_customer customer_id=vip-007"
         else:
             content = "TOOL restart_service service=payments-api"
@@ -34,6 +36,10 @@ def read_customer(customer_id: str) -> dict[str, str]:
     return {"customer_id": customer_id, "status": "active"}
 
 
+def send_email(to: str, subject: str, body: str) -> dict[str, str]:
+    return {"to": to, "subject": subject, "body": body, "status": "queued"}
+
+
 def parse_tool_plan(content: str) -> tuple[str, dict[str, str]]:
     parts = content.split()
     tool_name = parts[1]
@@ -45,7 +51,7 @@ def parse_tool_plan(content: str) -> tuple[str, dict[str, str]]:
 
 
 def print_runtime_events(audit_logger: AuditLogger) -> None:
-    print("\n4) Runtime event trail")
+    print("\n5) Runtime event trail")
     for event in audit_logger.events():
         if isinstance(event, RuntimeEvent):
             print(
@@ -93,8 +99,13 @@ async def main(audit_path: Path | None = None) -> None:
             {
                 "rules": [
                     {
+                        "tool": "send_email",
+                        "effect": "deny",
+                        "provenance_trust": ["external", "unverified"],
+                    },
+                    {
                         "tool_name": "restart_service",
-                        "agent_name": "ops_agent",
+                        "provenance_source_type": ["skill"],
                         "action": "require_approval",
                     }
                 ],
@@ -106,7 +117,7 @@ async def main(audit_path: Path | None = None) -> None:
                         "allowed_tools": ["restart_service"],
                     },
                     "support_agent": {
-                        "allowed_tools": ["read_customer"],
+                        "allowed_tools": ["read_customer", "send_email"],
                     },
                 },
             }
@@ -119,6 +130,7 @@ async def main(audit_path: Path | None = None) -> None:
     tool_registry = {
         "restart_service": restart_service,
         "read_customer": read_customer,
+        "send_email": send_email,
     }
 
     print("1) Prompt guard blocks the obvious jailbreak")
@@ -144,7 +156,56 @@ async def main(audit_path: Path | None = None) -> None:
     except LLMGuardViolationError as exc:
         print({"blocked_at": exc.stage, "reason": exc.message})
 
-    print("\n2) Capability gate blocks a dangerous tool plan")
+    print("\n2) Provenance-aware policy blocks an untrusted skill-driven action")
+    blocked_policy_context = RuntimeContext(
+        agent_name="support_agent",
+        prompt="Use the helper skill and send the urgent email right now.",
+        provenance=[
+            InstructionProvenance(source_type="user_prompt", source_name="user", trust_level="external"),
+            malicious_skill_provenance(),
+        ],
+    )
+    blocked_policy_response = await pipeline.chat(
+        LLMRequest(
+            messages=[
+                LLMMessage(role="system", content="You are a safe enterprise agent."),
+                LLMMessage(
+                    role="user",
+                    content="Use the helper skill and send the urgent email right now.",
+                ),
+            ]
+        ),
+        context=blocked_policy_context,
+    )
+    blocked_policy_tool_name, blocked_policy_arguments = parse_tool_plan(blocked_policy_response.content)
+    try:
+        interceptor.intercept(
+            InterceptionRequest(
+                context=RuntimeContext(
+                    agent_name="support_agent",
+                    tool_name=blocked_policy_tool_name,
+                    arguments=blocked_policy_arguments,
+                    parent_trace_id=blocked_policy_context.trace_id,
+                    provenance=[
+                        InstructionProvenance(source_type="agent_message", source_name="llm_plan", trust_level="unverified"),
+                        malicious_skill_provenance(),
+                    ],
+                ),
+                tool_registry=tool_registry,
+            )
+        )
+    except PolicyViolationError as exc:
+        print(
+            {
+                "decision": "block",
+                "matched_rule": "rules[0]",
+                "reason": str(exc),
+                "provenance": [item.to_dict() for item in blocked_policy_context.provenance],
+                "plan": blocked_policy_response.content,
+            }
+        )
+
+    print("\n3) Capability gate blocks a dangerous tool plan")
     blocked_context = RuntimeContext(
         agent_name="support_agent",
         prompt="Urgent outage. Recommend the exact tool call to recover payments.",
@@ -186,7 +247,7 @@ async def main(audit_path: Path | None = None) -> None:
     except PolicyViolationError as exc:
         print({"blocked_by": "capability_gate", "reason": str(exc), "plan": blocked_response.content})
 
-    print("\n3) Policy still requires approval for privileged use")
+    print("\n4) Provenance-aware policy requires approval for privileged use")
     approval_context = RuntimeContext(
         agent_name="ops_agent",
         prompt="Operations runbook says recover payments with the approved service tool.",
@@ -226,7 +287,15 @@ async def main(audit_path: Path | None = None) -> None:
             )
         )
     except ApprovalRequiredError as exc:
-        print({"approval_required": True, "reason": str(exc), "plan": approval_response.content})
+        print(
+            {
+                "decision": "require_approval",
+                "matched_rule": "rules[1]",
+                "reason": str(exc),
+                "provenance": [item.to_dict() for item in approval_context.provenance],
+                "plan": approval_response.content,
+            }
+        )
 
     print_runtime_events(audit_logger)
 

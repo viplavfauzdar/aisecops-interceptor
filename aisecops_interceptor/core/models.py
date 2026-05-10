@@ -65,6 +65,22 @@ class ExecutionPlan:
     provenance: list[InstructionProvenance] = field(default_factory=list)
     trace: DecisionTrace | None = None
 
+    def __post_init__(self) -> None:
+        self.provenance = [
+            item
+            if isinstance(item, InstructionProvenance)
+            else InstructionProvenance.from_dict(item)
+            for item in self.provenance
+        ]
+
+    def has_provenance_trust(self, *trust_levels: str) -> bool:
+        normalized = {value.lower() for value in trust_levels}
+        return any(item.trust_level.lower() in normalized for item in self.provenance)
+
+    def has_provenance_source_type(self, *source_types: str) -> bool:
+        normalized = {value.lower() for value in source_types}
+        return any(item.source_type.lower() in normalized for item in self.provenance)
+
 
 @dataclass(slots=True)
 class PolicyDecision:
