@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from aisecops_interceptor.core.context import RuntimeContext
+from aisecops_interceptor.core.models import InstructionProvenance
 
 
 def _sanitize_payload(value: Any) -> Any:
@@ -24,6 +25,9 @@ class RuntimeEvent:
     decision: str
     schema_version: str = "1.0"
     trace_id: str | None = None
+    parent_trace_id: str | None = None
+    execution_plan_id: str | None = None
+    decision_stage: str | None = None
     audit_kind: str | None = None
     reason: str | None = None
     stage: str | None = None
@@ -42,6 +46,7 @@ class RuntimeEvent:
     approval_id: str | None = None
     capabilities: list[str] | None = None
     capability_risks: dict[str, str | None] | None = None
+    provenance: list[InstructionProvenance] | None = None
     payload: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -50,6 +55,12 @@ class RuntimeEvent:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "RuntimeEvent":
         context_data = data.get("context")
+        if isinstance(context_data, dict) and isinstance(context_data.get("provenance"), list):
+            context_data = dict(context_data)
+            context_data["provenance"] = [
+                item if isinstance(item, InstructionProvenance) else InstructionProvenance.from_dict(item)
+                for item in context_data["provenance"]
+            ]
         context = RuntimeContext(**context_data) if isinstance(context_data, dict) else None
         if "event_type" not in data:
             is_allowed = bool(data["allowed"]) if data.get("allowed") is not None else None
@@ -70,6 +81,15 @@ class RuntimeEvent:
                 decision=decision,
                 schema_version=str(data.get("schema_version") or "1.0"),
                 trace_id=str(data["trace_id"]) if data.get("trace_id") is not None else None,
+                parent_trace_id=(
+                    str(data["parent_trace_id"]) if data.get("parent_trace_id") is not None else None
+                ),
+                execution_plan_id=(
+                    str(data["execution_plan_id"]) if data.get("execution_plan_id") is not None else None
+                ),
+                decision_stage=(
+                    str(data["decision_stage"]) if data.get("decision_stage") is not None else None
+                ),
                 audit_kind=str(data["audit_kind"]) if data.get("audit_kind") is not None else None,
                 reason=reason,
                 stage="tool",
@@ -94,6 +114,14 @@ class RuntimeEvent:
                     if isinstance(data.get("capability_risks"), dict)
                     else None
                 ),
+                provenance=(
+                    [
+                        item if isinstance(item, InstructionProvenance) else InstructionProvenance.from_dict(item)
+                        for item in data["provenance"]
+                    ]
+                    if isinstance(data.get("provenance"), list)
+                    else None
+                ),
                 payload=dict(data["payload"]) if isinstance(data.get("payload"), dict) else None,
             )
 
@@ -103,6 +131,15 @@ class RuntimeEvent:
             decision=str(data["decision"]),
             schema_version=str(data.get("schema_version") or "1.0"),
             trace_id=str(data["trace_id"]) if data.get("trace_id") is not None else None,
+            parent_trace_id=(
+                str(data["parent_trace_id"]) if data.get("parent_trace_id") is not None else None
+            ),
+            execution_plan_id=(
+                str(data["execution_plan_id"]) if data.get("execution_plan_id") is not None else None
+            ),
+            decision_stage=(
+                str(data["decision_stage"]) if data.get("decision_stage") is not None else None
+            ),
             audit_kind=str(data["audit_kind"]) if data.get("audit_kind") is not None else None,
             reason=str(data["reason"]) if data.get("reason") is not None else None,
             stage=str(data["stage"]) if data.get("stage") is not None else None,
@@ -127,6 +164,14 @@ class RuntimeEvent:
                 if isinstance(data.get("capability_risks"), dict)
                 else None
             ),
+            provenance=(
+                [
+                    item if isinstance(item, InstructionProvenance) else InstructionProvenance.from_dict(item)
+                    for item in data["provenance"]
+                ]
+                if isinstance(data.get("provenance"), list)
+                else None
+            ),
             payload=dict(data["payload"]) if isinstance(data.get("payload"), dict) else None,
         )
 
@@ -143,6 +188,9 @@ class RuntimeEvent:
         environment: str = "dev",
         session_id: str | None = None,
         trace_id: str | None = None,
+        parent_trace_id: str | None = None,
+        execution_plan_id: str | None = None,
+        decision_stage: str | None = None,
         correlation_id: str | None = None,
         allowed: bool | None = None,
         reason: str | None = None,
@@ -155,6 +203,7 @@ class RuntimeEvent:
         audit_kind: str | None = None,
         capabilities: list[str] | None = None,
         capability_risks: dict[str, str | None] | None = None,
+        provenance: list[InstructionProvenance] | None = None,
         payload: dict[str, Any] | None = None,
     ) -> "RuntimeEvent":
         return cls(
@@ -162,6 +211,9 @@ class RuntimeEvent:
             event_type=event_type,
             decision=decision,
             trace_id=trace_id,
+            parent_trace_id=parent_trace_id,
+            execution_plan_id=execution_plan_id,
+            decision_stage=decision_stage,
             audit_kind=audit_kind,
             reason=reason,
             stage=stage,
@@ -180,6 +232,7 @@ class RuntimeEvent:
             approval_id=approval_id,
             capabilities=capabilities,
             capability_risks=capability_risks,
+            provenance=provenance,
             payload=_sanitize_payload(payload) if payload is not None else None,
         )
 
@@ -195,8 +248,11 @@ class RuntimeEvent:
         risk_level: str = "low",
         matched_rule: str | None = None,
         approval_id: str | None = None,
+        execution_plan_id: str | None = None,
+        decision_stage: str | None = None,
         audit_kind: str | None = None,
         capability_risks: dict[str, str | None] | None = None,
+        provenance: list[InstructionProvenance] | None = None,
         payload: dict[str, Any] | None = None,
     ) -> "RuntimeEvent":
         return cls.create(
@@ -211,6 +267,9 @@ class RuntimeEvent:
             environment=context.environment,
             session_id=context.session_id,
             trace_id=context.trace_id,
+            parent_trace_id=context.parent_trace_id,
+            execution_plan_id=execution_plan_id,
+            decision_stage=decision_stage,
             correlation_id=context.correlation_id,
             allowed=allowed,
             reason=reason,
@@ -221,6 +280,7 @@ class RuntimeEvent:
             audit_kind=audit_kind,
             capabilities=list(context.allowed_capabilities) if context.allowed_capabilities is not None else None,
             capability_risks=capability_risks,
+            provenance=provenance if provenance is not None else (list(context.provenance) if context.provenance else None),
             payload=payload,
         )
 
@@ -234,7 +294,11 @@ class RuntimeEvent:
         stage: str | None = None,
         context: RuntimeContext | None = None,
         trace_id: str | None = None,
+        parent_trace_id: str | None = None,
+        execution_plan_id: str | None = None,
+        decision_stage: str | None = None,
         audit_kind: str | None = None,
+        provenance: list[InstructionProvenance] | None = None,
         payload: dict[str, Any] | None = None,
     ) -> "RuntimeEvent":
         return cls.create(
@@ -249,12 +313,16 @@ class RuntimeEvent:
             environment=context.environment if context else "dev",
             session_id=context.session_id if context else None,
             trace_id=context.trace_id if context else trace_id,
+            parent_trace_id=context.parent_trace_id if context else parent_trace_id,
+            execution_plan_id=execution_plan_id,
+            decision_stage=decision_stage,
             correlation_id=context.correlation_id if context else None,
             allowed=((decision == "allowed") if decision in {"allowed", "blocked"} else None),
             reason=reason,
             arguments=context.arguments if context else None,
             audit_kind=audit_kind,
             capabilities=list(context.allowed_capabilities) if context and context.allowed_capabilities is not None else None,
+            provenance=provenance if provenance is not None else (list(context.provenance) if context and context.provenance else None),
             payload=payload,
         )
 
@@ -268,11 +336,15 @@ class RuntimeEvent:
         stage: str | None = None,
         context: RuntimeContext | None = None,
         trace_id: str | None = None,
+        parent_trace_id: str | None = None,
+        execution_plan_id: str | None = None,
+        decision_stage: str | None = None,
         risk_level: str = "low",
         matched_rule: str | None = None,
         approval_id: str | None = None,
         capabilities: list[str] | None = None,
         capability_risks: dict[str, str | None] | None = None,
+        provenance: list[InstructionProvenance] | None = None,
         payload: dict[str, Any] | None = None,
     ) -> "RuntimeEvent":
         return cls.create(
@@ -288,6 +360,9 @@ class RuntimeEvent:
             environment=context.environment if context else "dev",
             session_id=context.session_id if context else None,
             trace_id=context.trace_id if context else trace_id,
+            parent_trace_id=context.parent_trace_id if context else parent_trace_id,
+            execution_plan_id=execution_plan_id,
+            decision_stage=decision_stage,
             correlation_id=context.correlation_id if context else None,
             allowed=None,
             arguments=context.arguments if context else None,
@@ -301,5 +376,6 @@ class RuntimeEvent:
                 else (list(context.allowed_capabilities) if context and context.allowed_capabilities is not None else None)
             ),
             capability_risks=capability_risks,
+            provenance=provenance if provenance is not None else (list(context.provenance) if context and context.provenance else None),
             payload=payload,
         )

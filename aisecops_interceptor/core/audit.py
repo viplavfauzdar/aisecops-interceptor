@@ -85,8 +85,18 @@ class AuditLogger:
             return
         event.trace_id = uuid4().hex
 
+    @staticmethod
+    def _ensure_event_replay_metadata(event: RuntimeEvent) -> None:
+        if event.context is None:
+            return
+        if event.parent_trace_id is None:
+            event.parent_trace_id = event.context.parent_trace_id
+        if event.provenance is None and event.context.provenance:
+            event.provenance = list(event.context.provenance)
+
     def log(self, event: RuntimeEvent) -> None:
         self._ensure_trace_id(event)
+        self._ensure_event_replay_metadata(event)
         for sink in self.sinks:
             try:
                 sink.emit(event)

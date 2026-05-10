@@ -439,6 +439,12 @@ Runtime events can be persisted to JSONL and retrieved through the API for downs
 The default API audit log path is `logs/audit.jsonl`.
 Each persisted event carries a generated `trace_id` and a unified schema with stable top-level fields such as `schema_version`, `event_type`, `decision`, `audit_kind`, `stage`, `risk_level`, `capabilities`, `capability_risks`, and `payload`.
 Tool-stage auditing now records plan creation, decision evaluation, tool-call receipt, allow/block-or-approval decisions, execution, and final output using that same schema.
+
+### Instruction provenance
+
+AISecOps records where instructions came from, such as prompts, skills, retrieved content, memory, or tool results.
+That provenance is included in replayable JSONL audit events, which prepares future replay and debug tooling without changing current enforcement behavior.
+
 The `/audit` endpoint supports optional query parameters: `event_type`, `stage`, `agent_name`, `tool_name`, `correlation_id`, and `limit`.
 `AuditLogger` can also emit the same `RuntimeEvent` records to multiple sinks, such as JSONL persistence and additional in-memory or external streaming adapters.
 Supported sink types include file-backed JSONL persistence, in-memory collection, and webhook delivery to external HTTP endpoints.
