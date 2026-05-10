@@ -44,24 +44,50 @@ def parse_rule(data: Any) -> Rule:
     if not isinstance(data, dict):
         raise PolicyBundleValidationError("Each rule must be a mapping")
 
-    tool_name = data.get("tool_name")
-    if tool_name is None or str(tool_name).strip() == "":
-        raise PolicyBundleValidationError("Rule field 'tool_name' is required")
+    tool_name = data.get("tool_name", data.get("tool"))
+    if tool_name is not None and str(tool_name).strip() == "":
+        raise PolicyBundleValidationError("Rule field 'tool_name' must be non-empty when provided")
 
-    action = data.get("action")
+    action = data.get("action", data.get("effect"))
     if action is None:
         raise PolicyBundleValidationError("Rule field 'action' is required")
+    normalized_action = str(action)
+    if normalized_action == "deny":
+        normalized_action = "block"
+
+    raw_provenance_trust = data.get("provenance_trust", [])
+    if raw_provenance_trust is None:
+        raw_provenance_trust = []
+    if not isinstance(raw_provenance_trust, list):
+        raise PolicyBundleValidationError("Rule field 'provenance_trust' must be a list")
+
+    raw_provenance_source_type = data.get("provenance_source_type", [])
+    if raw_provenance_source_type is None:
+        raw_provenance_source_type = []
+    if not isinstance(raw_provenance_source_type, list):
+        raise PolicyBundleValidationError("Rule field 'provenance_source_type' must be a list")
+
+    if (
+        tool_name is None
+        and data.get("agent_name") is None
+        and data.get("sensitivity_level") is None
+        and not raw_provenance_trust
+        and not raw_provenance_source_type
+    ):
+        raise PolicyBundleValidationError("Rule must define at least one matching condition")
 
     try:
         return Rule(
-            tool_name=str(tool_name),
-            action=str(action),
+            tool_name=str(tool_name) if tool_name is not None else None,
+            action=normalized_action,
             agent_name=str(data["agent_name"]) if data.get("agent_name") is not None else None,
             sensitivity_level=(
                 str(data["sensitivity_level"])
                 if data.get("sensitivity_level") is not None
                 else None
             ),
+            provenance_trust=tuple(str(value) for value in raw_provenance_trust),
+            provenance_source_type=tuple(str(value) for value in raw_provenance_source_type),
         )
     except ValueError as exc:
         raise PolicyBundleValidationError(str(exc)) from exc

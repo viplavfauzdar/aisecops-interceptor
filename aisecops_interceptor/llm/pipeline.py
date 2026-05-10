@@ -52,7 +52,10 @@ class GuardedLLMPipeline:
                 stage=stage,
                 context=context,
                 trace_id=trace_id,
+                parent_trace_id=context.parent_trace_id if context else None,
+                decision_stage=stage,
                 audit_kind=event_type,
+                provenance=list(context.provenance) if context and context.provenance else None,
                 payload=payload,
             )
         )

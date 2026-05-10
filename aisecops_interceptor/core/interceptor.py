@@ -49,7 +49,10 @@ class AgentInterceptor:
                 risk_level=trace.policy_decision.risk_level if trace.policy_decision is not None else "low",
                 matched_rule=trace.policy_decision.matched_rule if trace.policy_decision is not None else None,
                 approval_id=plan.approval_id,
+                execution_plan_id=plan.execution_plan_id,
+                decision_stage="execute",
                 capability_risks=capability_risks,
+                provenance=plan.provenance or None,
                 payload={
                     "tool_name": context.tool_name,
                     "arguments": context.arguments,
@@ -68,8 +71,11 @@ class AgentInterceptor:
                     risk_level="medium",
                     matched_rule="capability_gate",
                     approval_id=plan.approval_id,
+                    execution_plan_id=plan.execution_plan_id,
+                    decision_stage="decision",
                     capability_risks=capability_risks,
                     audit_kind="capability",
+                    provenance=plan.provenance or None,
                     payload={"capability_result": trace.capability_result},
                 )
             )
@@ -103,8 +109,11 @@ class AgentInterceptor:
                     risk_level=decision.risk_level,
                     matched_rule=decision.matched_rule,
                     approval_id=approval_request.approval_id,
+                    execution_plan_id=plan.execution_plan_id,
+                    decision_stage="decision",
                     capability_risks=capability_risks,
                     audit_kind="decision",
+                    provenance=plan.provenance or None,
                     payload={"approval_required": True},
                 )
             )
@@ -128,8 +137,11 @@ class AgentInterceptor:
                 risk_level=decision.risk_level,
                 matched_rule=decision.matched_rule,
                 approval_id=plan.approval_id,
+                execution_plan_id=plan.execution_plan_id,
+                decision_stage="decision",
                 capability_risks=capability_risks,
                 audit_kind="decision",
+                provenance=plan.provenance or None,
                 payload={"approved": approved, "requires_approval": decision.requires_approval},
             )
         )
@@ -163,8 +175,11 @@ class AgentInterceptor:
                 risk_level=decision.risk_level,
                 matched_rule=decision.matched_rule,
                 approval_id=plan.approval_id,
+                execution_plan_id=plan.execution_plan_id,
+                decision_stage="execute",
                 capability_risks=capability_risks,
                 audit_kind="tool_execution",
+                provenance=plan.provenance or None,
             )
         )
         self.audit_logger.log(
@@ -177,7 +192,10 @@ class AgentInterceptor:
                 risk_level=decision.risk_level,
                 matched_rule=decision.matched_rule,
                 approval_id=plan.approval_id,
+                execution_plan_id=plan.execution_plan_id,
+                decision_stage="execute",
                 capability_risks=capability_risks,
+                provenance=plan.provenance or None,
                 payload={"result": result},
             )
         )
@@ -193,6 +211,7 @@ class AgentInterceptor:
             tool_registry=request.tool_registry,
             approval_id=request.approval_id,
             dry_run=request.dry_run,
+            provenance=list(request.context.provenance),
         )
         self.audit_logger.log(
             RuntimeEvent.audit_event(
@@ -202,7 +221,10 @@ class AgentInterceptor:
                 stage="tool",
                 context=request.context,
                 approval_id=request.approval_id,
+                execution_plan_id=plan.execution_plan_id,
+                decision_stage="plan",
                 capability_risks=self._capability_risks_for_tool(request.context.tool_name),
+                provenance=plan.provenance or None,
                 payload={
                     "dry_run": request.dry_run,
                     "tool_name": request.context.tool_name,
@@ -244,9 +266,12 @@ class AgentInterceptor:
                     risk_level="medium",
                     matched_rule="capability_gate",
                     approval_id=plan.approval_id,
+                    execution_plan_id=plan.execution_plan_id,
+                    decision_stage="evaluate",
                     capability_risks=capability_metadata and {
                         name: definition.risk for name, definition in capability_metadata.items()
                     },
+                    provenance=plan.provenance or None,
                     payload={
                         "capability_result": trace.capability_result,
                         "policy_result": trace.policy_result,
@@ -301,9 +326,12 @@ class AgentInterceptor:
                 risk_level=decision.risk_level,
                 matched_rule=decision.matched_rule,
                 approval_id=plan.approval_id,
+                execution_plan_id=plan.execution_plan_id,
+                decision_stage="evaluate",
                 capability_risks=capability_metadata and {
                     name: definition.risk for name, definition in capability_metadata.items()
                 },
+                provenance=plan.provenance or None,
                 payload={
                     "capability_result": trace.capability_result,
                     "policy_result": trace.policy_result,

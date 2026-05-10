@@ -36,6 +36,18 @@ high_risk_tools:
   - restart_service
   - export_data
 
+rules:
+  - tool: send_email
+    effect: deny
+    provenance_trust:
+      - external
+      - unverified
+
+  - tool: restart_service
+    effect: require_approval
+    provenance_source_type:
+      - skill
+
 agents:
   sales_agent:
     allowed_tools:
