@@ -49,6 +49,9 @@ dev = [
   "pytest==9.0.3",
 ]
 
+[project.scripts]
+aisecops-replay = "aisecops_interceptor.replay.cli:main"
+
 [tool.setuptools.packages.find]
 include = ["aisecops_interceptor*"]
 

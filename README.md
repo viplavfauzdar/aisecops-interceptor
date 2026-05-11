@@ -450,6 +450,15 @@ That provenance is included in replayable JSONL audit events, which prepares fut
 AISecOps can evaluate instruction origin during policy enforcement.
 Policies may deny or escalate based on provenance trust or provenance source type, which is useful for malicious skills, retrieval poisoning, and multi-agent trust boundaries.
 
+### Replay audit events
+
+AISecOps can replay one recorded `trace_id` from structured JSONL audit logs into a human-readable timeline.
+This helps with forensics and governance by reconstructing what was observed, planned, evaluated, and executed for a single run.
+
+```bash
+python -m aisecops_interceptor.replay.cli --trace-id <trace_id> --audit-file logs/audit.jsonl
+```
+
 The `/audit` endpoint supports optional query parameters: `event_type`, `stage`, `agent_name`, `tool_name`, `correlation_id`, and `limit`.
 `AuditLogger` can also emit the same `RuntimeEvent` records to multiple sinks, such as JSONL persistence and additional in-memory or external streaming adapters.
 Supported sink types include file-backed JSONL persistence, in-memory collection, and webhook delivery to external HTTP endpoints.
