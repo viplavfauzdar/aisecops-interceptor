@@ -459,6 +459,14 @@ This helps with forensics and governance by reconstructing what was observed, pl
 python -m aisecops_interceptor.replay.cli --trace-id <trace_id> --audit-file logs/audit.jsonl
 ```
 
+`aisecops-replay --trace-id <trace_id> --audit-file logs/audit.jsonl --summary`
+prints a concise run summary for fast audit review.
+
+### Audit schema stability
+
+Starting in `v0.5.0`, new audit events include a stable `schema_version` and unique `event_id`.
+Replay remains backward-compatible with older JSONL audit records that do not carry that metadata.
+
 The `/audit` endpoint supports optional query parameters: `event_type`, `stage`, `agent_name`, `tool_name`, `correlation_id`, and `limit`.
 `AuditLogger` can also emit the same `RuntimeEvent` records to multiple sinks, such as JSONL persistence and additional in-memory or external streaming adapters.
 Supported sink types include file-backed JSONL persistence, in-memory collection, and webhook delivery to external HTTP endpoints.

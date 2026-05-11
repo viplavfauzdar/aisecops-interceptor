@@ -3,9 +3,13 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any
+from uuid import uuid4
 
 from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.models import InstructionProvenance
+
+AUDIT_SCHEMA_VERSION = "0.5.0"
+EVENT_ID_PREFIX = "evt-"
 
 
 def _sanitize_payload(value: Any) -> Any:
@@ -23,7 +27,8 @@ class RuntimeEvent:
     timestamp: str
     event_type: str
     decision: str
-    schema_version: str = "1.0"
+    schema_version: str | None = None
+    event_id: str | None = None
     trace_id: str | None = None
     parent_trace_id: str | None = None
     execution_plan_id: str | None = None
@@ -79,7 +84,8 @@ class RuntimeEvent:
                 timestamp=str(data["timestamp"]),
                 event_type=event_type,
                 decision=decision,
-                schema_version=str(data.get("schema_version") or "1.0"),
+                schema_version=str(data["schema_version"]) if data.get("schema_version") is not None else None,
+                event_id=str(data["event_id"]) if data.get("event_id") is not None else None,
                 trace_id=str(data["trace_id"]) if data.get("trace_id") is not None else None,
                 parent_trace_id=(
                     str(data["parent_trace_id"]) if data.get("parent_trace_id") is not None else None
@@ -129,7 +135,8 @@ class RuntimeEvent:
             timestamp=str(data["timestamp"]),
             event_type=str(data["event_type"]),
             decision=str(data["decision"]),
-            schema_version=str(data.get("schema_version") or "1.0"),
+            schema_version=str(data["schema_version"]) if data.get("schema_version") is not None else None,
+            event_id=str(data["event_id"]) if data.get("event_id") is not None else None,
             trace_id=str(data["trace_id"]) if data.get("trace_id") is not None else None,
             parent_trace_id=(
                 str(data["parent_trace_id"]) if data.get("parent_trace_id") is not None else None
@@ -210,6 +217,8 @@ class RuntimeEvent:
             timestamp=datetime.now(timezone.utc).isoformat(),
             event_type=event_type,
             decision=decision,
+            schema_version=AUDIT_SCHEMA_VERSION,
+            event_id=f"{EVENT_ID_PREFIX}{uuid4().hex}",
             trace_id=trace_id,
             parent_trace_id=parent_trace_id,
             execution_plan_id=execution_plan_id,

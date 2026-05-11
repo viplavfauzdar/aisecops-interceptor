@@ -3,6 +3,7 @@
 from .engine import (
     AuditFileNotFoundError,
     AuditReplayEngine,
+    ReplaySummary,
     ReplayTimeline,
     ReplayTimelineEntry,
     ReplayWarning,
@@ -12,6 +13,7 @@ from .engine import (
 __all__ = [
     "AuditFileNotFoundError",
     "AuditReplayEngine",
+    "ReplaySummary",
     "ReplayTimeline",
     "ReplayTimelineEntry",
     "ReplayWarning",

@@ -4,7 +4,7 @@ import pytest
 
 from aisecops_interceptor.core.audit import AuditLogger
 from aisecops_interceptor.core.context import RuntimeContext
-from aisecops_interceptor.core.events import RuntimeEvent
+from aisecops_interceptor.core.events import AUDIT_SCHEMA_VERSION, RuntimeEvent
 from aisecops_interceptor.core.models import InstructionProvenance
 from aisecops_interceptor.replay.engine import AuditReplayEngine, TraceNotFoundError
 
@@ -122,6 +122,8 @@ def test_replay_includes_provenance(tmp_path) -> None:
     timeline = AuditReplayEngine().replay_trace(audit_file, "run-123")
 
     assert timeline.entries[0].provenance[0].source_name == "untrusted_openclaw_skill"
+    assert timeline.entries[0].schema_version == AUDIT_SCHEMA_VERSION
+    assert timeline.entries[0].event_id is not None
 
 
 def test_replay_skips_malformed_jsonl_lines_when_recoverable(tmp_path) -> None:
@@ -168,3 +170,63 @@ def test_replay_raises_for_missing_trace(tmp_path) -> None:
 
     with pytest.raises(TraceNotFoundError):
         AuditReplayEngine().replay_trace(audit_file, "run-missing")
+
+
+def test_replay_handles_legacy_records_without_schema_or_event_id(tmp_path) -> None:
+    audit_file = tmp_path / "audit.jsonl"
+    legacy_record = {
+        "timestamp": "2026-05-10T00:00:00+00:00",
+        "event_type": "tool_blocked",
+        "decision": "blocked",
+        "trace_id": "run-legacy",
+        "decision_stage": "policy",
+        "agent_name": "demo-agent",
+        "tool_name": "send_email",
+        "reason": "Legacy policy block",
+        "provenance": [],
+    }
+    audit_file.write_text(json.dumps(legacy_record) + "\n", encoding="utf-8")
+
+    timeline = AuditReplayEngine().replay_trace(audit_file, "run-legacy")
+
+    assert timeline.entries[0].schema_version is None
+    assert timeline.entries[0].event_id is None
+
+
+def test_replay_summary_includes_provenance_trust_and_schema_versions(tmp_path) -> None:
+    audit_file = tmp_path / "audit.jsonl"
+    logger = AuditLogger(log_path=str(audit_file))
+    provenance = [
+        InstructionProvenance(
+            source_type="skill",
+            source_name="untrusted_openclaw_skill",
+            trust_level="unverified",
+        ),
+        InstructionProvenance(
+            source_type="system_prompt",
+            source_name="ops_runbook",
+            trust_level="trusted",
+        ),
+    ]
+    _write_event(
+        logger,
+        trace_id="run-123",
+        event_type="tool_blocked",
+        decision="blocked",
+        tool_name="send_email",
+        execution_plan_id="plan-2",
+        decision_stage="policy",
+        reason="Unverified skill provenance",
+        provenance=provenance,
+    )
+
+    timeline = AuditReplayEngine().replay_trace(audit_file, "run-123")
+    summary = AuditReplayEngine.summarize_timeline(timeline)
+
+    assert summary.trace_id == "run-123"
+    assert summary.event_count == 1
+    assert summary.final_decision == "blocked"
+    assert summary.tool_name == "send_email"
+    assert summary.final_reason == "Unverified skill provenance"
+    assert summary.provenance_trust_summary == {"trusted": 1, "unverified": 1}
+    assert summary.schema_versions_observed == [AUDIT_SCHEMA_VERSION]

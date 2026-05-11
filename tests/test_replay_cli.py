@@ -41,6 +41,8 @@ def test_replay_cli_prints_human_readable_timeline(tmp_path, capsys) -> None:
     assert code == 0
     assert "Trace: run-123" in captured.out
     assert "[1] tool_blocked" in captured.out
+    assert "event_id: evt-" in captured.out
+    assert "schema_version: 0.5.0" in captured.out
     assert "tool: send_email" in captured.out
     assert "Provenance:" in captured.out
     assert "- skill: untrusted_openclaw_skill (trust: unverified)" in captured.out
@@ -89,3 +91,70 @@ def test_replay_cli_reports_recoverable_warnings(tmp_path, capsys) -> None:
 
     assert code == 0
     assert "Warning: line 2" in captured.err
+
+
+def test_replay_cli_summary_mode_prints_concise_summary(tmp_path, capsys) -> None:
+    audit_file = tmp_path / "audit.jsonl"
+    logger = AuditLogger(log_path=str(audit_file))
+    logger.log(
+        RuntimeEvent.audit_event(
+            event_type="tool_blocked",
+            decision="blocked",
+            reason="unverified skill provenance",
+            stage="tool",
+            context=RuntimeContext(
+                agent_name="demo-agent",
+                tool_name="send_email",
+                trace_id="run-123",
+            ),
+            execution_plan_id="plan-1",
+            decision_stage="policy",
+            provenance=[
+                InstructionProvenance(
+                    source_type="skill",
+                    source_name="untrusted_openclaw_skill",
+                    trust_level="unverified",
+                )
+            ],
+        )
+    )
+
+    code = main(["--trace-id", "run-123", "--audit-file", str(audit_file), "--summary"])
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert "Trace: run-123" in captured.out
+    assert "event_count: 1" in captured.out
+    assert "final_decision: blocked" in captured.out
+    assert "tool: send_email" in captured.out
+    assert "final_reason: unverified skill provenance" in captured.out
+    assert "provenance_trust: unverified=1" in captured.out
+    assert "schema_versions: 0.5.0" in captured.out
+
+
+def test_replay_cli_shows_legacy_markers_for_old_records(tmp_path, capsys) -> None:
+    audit_file = tmp_path / "audit.jsonl"
+    audit_file.write_text(
+        json.dumps(
+            {
+                "timestamp": "2026-05-10T00:00:00+00:00",
+                "event_type": "tool_blocked",
+                "decision": "blocked",
+                "trace_id": "run-legacy",
+                "decision_stage": "policy",
+                "agent_name": "demo-agent",
+                "tool_name": "send_email",
+                "reason": "Legacy policy block",
+                "provenance": [],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    code = main(["--trace-id", "run-legacy", "--audit-file", str(audit_file)])
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert "event_id: missing" in captured.out
+    assert "schema_version: legacy" in captured.out
