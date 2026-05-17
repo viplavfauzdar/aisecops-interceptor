@@ -23,6 +23,7 @@
 - [Full local quick start](#full-local-quick-start)
 - [API: Execute vs Explain](#api-execute-vs-explain)
 - [Interactive API docs](#interactive-api-docs)
+- [Replay screenshots](#replay-screenshots)
 - [Architecture direction](#architecture-direction)
 
 AISecOps Interceptor provides a framework-agnostic control plane to detect prompt injections, prevent secret leakage, and enforce human-in-the-loop approvals before your agents execute dangerous tools.
@@ -484,7 +485,33 @@ curl http://127.0.0.1:8000/replay/<trace_id>
 curl http://127.0.0.1:8000/replay/<trace_id>/summary
 ```
 
+
 The summary endpoint is useful for quick audit review, while the full replay endpoint returns the ordered timeline, execution plan grouping context, schema versions observed, and provenance summary.
+
+### Replay screenshots
+
+Replay views are intended to show how AISecOps reconstructs runtime decisions from structured JSONL audit events.
+
+Planned screenshots:
+
+#### Replay summary
+
+![AISecOps Replay Summary](docs/replay-summary.png)
+
+Shows the concise investigation view for a trace, including final decision, event count, tool name, reason, provenance trust summary, and schema versions observed.
+
+#### Replay timeline
+
+![AISecOps Replay Timeline](docs/replay-timeline.png)
+
+Shows the ordered runtime timeline for a trace, including prompt/input events, execution plan creation, capability checks, policy decisions, approval flow, execution outcomes, event IDs, schema versions, and provenance metadata.
+
+To add these screenshots later:
+
+```text
+docs/replay-summary.png
+docs/replay-timeline.png
+```
 
 The `/audit` endpoint supports optional query parameters: `event_type`, `stage`, `agent_name`, `tool_name`, `correlation_id`, and `limit`.
 `AuditLogger` can also emit the same `RuntimeEvent` records to multiple sinks, such as JSONL persistence and additional in-memory or external streaming adapters.
