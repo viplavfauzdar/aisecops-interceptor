@@ -2,17 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## v0.6.0
 
 ### Added
 
-- Replay API endpoints for trace reconstruction.
-- Replay summary API endpoint.
-- Swagger documentation for replay endpoints.
+- Replay API endpoint: `GET /replay/{trace_id}`.
+- Replay summary API endpoint: `GET /replay/{trace_id}/summary`.
+- Swagger/OpenAPI documentation for replay endpoints.
+- Provenance-aware replay responses through the API.
+- Structured not-found responses for missing replay traces or audit files.
+
+### Changed
+
+- Replay functionality is now available through both CLI and API surfaces.
+- Replay API reuses the existing JSONL replay engine instead of duplicating parsing logic.
 
 ### Notes
 
+- Replay remains file-order based.
 - Replay UI remains future roadmap work.
+- Authentication and access control are not yet implemented for replay endpoints.
 
 ## v0.5.0
 

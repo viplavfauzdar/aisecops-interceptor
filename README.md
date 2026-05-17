@@ -471,7 +471,7 @@ Replay remains backward-compatible with older JSONL audit records that do not ca
 ### Replay API
 
 The replay API exposes the same trace reconstruction and summary logic used by the replay CLI.
-It exists to support remote investigation workflows now and to prepare the future replay UI without changing the underlying JSONL replay engine.
+It exists to support remote investigation workflows now, Swagger shows these replay endpoints for local exploration, and it prepares the future replay UI without changing the underlying JSONL replay engine.
 
 Endpoints:
 - `GET /replay/{trace_id}`
