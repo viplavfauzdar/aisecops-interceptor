@@ -467,6 +467,25 @@ prints a concise run summary for fast audit review.
 
 Starting in `v0.5.0`, new audit events include a stable `schema_version` and unique `event_id`.
 Replay remains backward-compatible with older JSONL audit records that do not carry that metadata.
+
+### Replay API
+
+The replay API exposes the same trace reconstruction and summary logic used by the replay CLI.
+It exists to support remote investigation workflows now and to prepare the future replay UI without changing the underlying JSONL replay engine.
+
+Endpoints:
+- `GET /replay/{trace_id}`
+- `GET /replay/{trace_id}/summary`
+
+Examples:
+
+```bash
+curl http://127.0.0.1:8000/replay/<trace_id>
+curl http://127.0.0.1:8000/replay/<trace_id>/summary
+```
+
+The summary endpoint is useful for quick audit review, while the full replay endpoint returns the ordered timeline, execution plan grouping context, schema versions observed, and provenance summary.
+
 The `/audit` endpoint supports optional query parameters: `event_type`, `stage`, `agent_name`, `tool_name`, `correlation_id`, and `limit`.
 `AuditLogger` can also emit the same `RuntimeEvent` records to multiple sinks, such as JSONL persistence and additional in-memory or external streaming adapters.
 Supported sink types include file-backed JSONL persistence, in-memory collection, and webhook delivery to external HTTP endpoints.

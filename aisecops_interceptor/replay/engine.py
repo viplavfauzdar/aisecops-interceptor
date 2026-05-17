@@ -76,6 +76,18 @@ class ReplaySummary:
     schema_versions_observed: list[str]
 
 
+@dataclass(slots=True)
+class ReplayTraceResult:
+    trace_id: str
+    event_count: int
+    execution_plan_ids: list[str]
+    timeline: list[ReplayTimelineEntry]
+    schema_versions_observed: list[str]
+    provenance_summary: dict[str, int]
+    final_decision: str | None
+    final_reason: str | None
+
+
 class AuditReplayEngine:
     def replay_trace(self, audit_file: str | Path, trace_id: str) -> ReplayTimeline:
         path = Path(audit_file)
@@ -144,4 +156,27 @@ class AuditReplayEngine:
             final_reason=final_entry.reason if final_entry is not None else None,
             provenance_trust_summary=trust_summary,
             schema_versions_observed=schema_versions,
+        )
+
+    @staticmethod
+    def build_trace_result(timeline: ReplayTimeline) -> ReplayTraceResult:
+        summary = AuditReplayEngine.summarize_timeline(timeline)
+        execution_plan_ids: list[str] = []
+        seen_plan_ids: set[str] = set()
+
+        for entry in timeline.entries:
+            if entry.execution_plan_id is None or entry.execution_plan_id in seen_plan_ids:
+                continue
+            seen_plan_ids.add(entry.execution_plan_id)
+            execution_plan_ids.append(entry.execution_plan_id)
+
+        return ReplayTraceResult(
+            trace_id=timeline.trace_id,
+            event_count=len(timeline.entries),
+            execution_plan_ids=execution_plan_ids,
+            timeline=list(timeline.entries),
+            schema_versions_observed=summary.schema_versions_observed,
+            provenance_summary=summary.provenance_trust_summary,
+            final_decision=summary.final_decision,
+            final_reason=summary.final_reason,
         )

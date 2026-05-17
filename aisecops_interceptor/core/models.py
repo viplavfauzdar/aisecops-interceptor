@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 from uuid import uuid4
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from aisecops_interceptor.core.context import RuntimeContext
 
@@ -140,6 +140,41 @@ class APIResponse(BaseModel):
     reason: str
     data: dict[str, Any] | None = None
     trace: ExplainTraceModel | None = None
+
+
+class ReplayTimelineEntryModel(BaseModel):
+    timestamp: str
+    event_type: str
+    schema_version: str | None = None
+    event_id: str | None = None
+    decision_stage: str | None = None
+    agent_name: str | None = None
+    tool_name: str | None = None
+    decision: str
+    reason: str | None = None
+    provenance: list[dict[str, Any]] = Field(default_factory=list)
+    execution_plan_id: str | None = None
+
+
+class ReplayTraceResponseModel(BaseModel):
+    trace_id: str
+    event_count: int
+    execution_plan_ids: list[str] = Field(default_factory=list)
+    timeline: list[ReplayTimelineEntryModel] = Field(default_factory=list)
+    schema_versions_observed: list[str] = Field(default_factory=list)
+    provenance_summary: dict[str, int] = Field(default_factory=dict)
+    final_decision: str | None = None
+    final_reason: str | None = None
+
+
+class ReplaySummaryResponseModel(BaseModel):
+    trace_id: str
+    event_count: int
+    final_decision: str | None = None
+    tool_name: str | None = None
+    final_reason: str | None = None
+    provenance_trust_summary: dict[str, int] = Field(default_factory=dict)
+    schema_versions_observed: list[str] = Field(default_factory=list)
 
 
 @dataclass(slots=True)

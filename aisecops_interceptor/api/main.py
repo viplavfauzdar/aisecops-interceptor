@@ -17,10 +17,14 @@ from aisecops_interceptor.core.models import (
     DryRunResultModel,
     ExplainTraceModel,
     InterceptionRequest,
+    ReplaySummaryResponseModel,
+    ReplayTimelineEntryModel,
+    ReplayTraceResponseModel,
     ToolCall,
 )
 from aisecops_interceptor.core.policy import PolicyEngine
 from aisecops_interceptor.integrations.openclaw_adapter import OpenClawToolRunnerAdapter
+from aisecops_interceptor.replay.engine import AuditFileNotFoundError, AuditReplayEngine, TraceNotFoundError
 from aisecops_interceptor import __version__
 
 app = FastAPI(title="AISecOps Interceptor", version=__version__)
@@ -35,6 +39,7 @@ interceptor = AgentInterceptor(
     capability_registry=capabilities,
 )
 openclaw_adapter = OpenClawToolRunnerAdapter(interceptor=interceptor)
+replay_engine = AuditReplayEngine()
 
 
 def read_customer(customer_id: str) -> dict[str, str]:
@@ -337,6 +342,86 @@ EXPLAIN_RESPONSES = {
     },
 }
 
+REPLAY_RESPONSES = {
+    200: {
+        "description": "Full replay reconstruction for a trace",
+        "model": ReplayTraceResponseModel,
+        "content": {
+            "application/json": {
+                "example": {
+                    "trace_id": "run-123",
+                    "event_count": 2,
+                    "execution_plan_ids": ["plan-123"],
+                    "timeline": [
+                        {
+                            "timestamp": "2026-05-17T00:00:00+00:00",
+                            "event_type": "plan",
+                            "schema_version": "0.5.0",
+                            "event_id": "evt-abc123",
+                            "decision_stage": "plan",
+                            "agent_name": "ops_agent",
+                            "tool_name": "restart_service",
+                            "decision": "pending",
+                            "reason": "Execution plan created",
+                            "provenance": [
+                                {
+                                    "source_type": "skill",
+                                    "source_name": "untrusted_openclaw_skill",
+                                    "source_hash": None,
+                                    "origin_uri": None,
+                                    "trust_level": "unverified",
+                                    "metadata": {},
+                                }
+                            ],
+                            "execution_plan_id": "plan-123",
+                        }
+                    ],
+                    "schema_versions_observed": ["0.5.0"],
+                    "provenance_summary": {"unverified": 1},
+                    "final_decision": "blocked",
+                    "final_reason": "Rule blocked tool 'send_email'",
+                }
+            }
+        },
+    },
+    404: {
+        "description": "Trace or audit file not found",
+        "model": APIResponse,
+        "content": {
+            "application/json": {
+                "example": {
+                    "status": "blocked",
+                    "decision": "block",
+                    "reason": "No audit events found for trace_id 'run-missing'",
+                    "data": None,
+                    "trace": None,
+                }
+            }
+        },
+    },
+}
+
+REPLAY_SUMMARY_RESPONSES = {
+    200: {
+        "description": "Concise replay summary for a trace",
+        "model": ReplaySummaryResponseModel,
+        "content": {
+            "application/json": {
+                "example": {
+                    "trace_id": "run-123",
+                    "event_count": 2,
+                    "final_decision": "blocked",
+                    "tool_name": "send_email",
+                    "final_reason": "Rule blocked tool 'send_email'",
+                    "provenance_trust_summary": {"unverified": 1},
+                    "schema_versions_observed": ["0.5.0"],
+                }
+            }
+        },
+    },
+    404: REPLAY_RESPONSES[404],
+}
+
 
 class ExecuteRequest(BaseModel):
     agent_name: str = Field(..., examples=["sales_agent"])
@@ -410,6 +495,41 @@ def _tool_not_found_response(tool_name: str) -> JSONResponse:
             reason=f"Tool '{tool_name}' not found",
         ).model_dump(),
     )
+
+
+def replay_audit_file_path() -> str:
+    return DEFAULT_AUDIT_LOG_PATH
+
+
+def _replay_not_found_response(reason: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=404,
+        content=APIResponse(
+            status="blocked",
+            decision="block",
+            reason=reason,
+        ).model_dump(),
+    )
+
+
+def _replay_timeline_entry_payload(entry) -> ReplayTimelineEntryModel:
+    return ReplayTimelineEntryModel(
+        timestamp=entry.timestamp,
+        event_type=entry.event_type,
+        schema_version=entry.schema_version,
+        event_id=entry.event_id,
+        decision_stage=entry.decision_stage,
+        agent_name=entry.agent_name,
+        tool_name=entry.tool_name,
+        decision=entry.decision,
+        reason=entry.reason,
+        provenance=[item.to_dict() for item in entry.provenance],
+        execution_plan_id=entry.execution_plan_id,
+    )
+
+
+def _load_replay_timeline(trace_id: str):
+    return replay_engine.replay_trace(replay_audit_file_path(), trace_id)
 
 
 @app.post(
@@ -500,6 +620,45 @@ def root() -> RedirectResponse:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/replay/{trace_id}", responses=REPLAY_RESPONSES, response_model=ReplayTraceResponseModel)
+def replay_trace(trace_id: str):
+    try:
+        timeline = _load_replay_timeline(trace_id)
+    except (AuditFileNotFoundError, TraceNotFoundError) as exc:
+        return _replay_not_found_response(str(exc))
+
+    result = replay_engine.build_trace_result(timeline)
+    return ReplayTraceResponseModel(
+        trace_id=result.trace_id,
+        event_count=result.event_count,
+        execution_plan_ids=result.execution_plan_ids,
+        timeline=[_replay_timeline_entry_payload(entry) for entry in result.timeline],
+        schema_versions_observed=result.schema_versions_observed,
+        provenance_summary=result.provenance_summary,
+        final_decision=result.final_decision,
+        final_reason=result.final_reason,
+    ).model_dump()
+
+
+@app.get("/replay/{trace_id}/summary", responses=REPLAY_SUMMARY_RESPONSES, response_model=ReplaySummaryResponseModel)
+def replay_trace_summary(trace_id: str):
+    try:
+        timeline = _load_replay_timeline(trace_id)
+    except (AuditFileNotFoundError, TraceNotFoundError) as exc:
+        return _replay_not_found_response(str(exc))
+
+    summary = replay_engine.summarize_timeline(timeline)
+    return ReplaySummaryResponseModel(
+        trace_id=summary.trace_id,
+        event_count=summary.event_count,
+        final_decision=summary.final_decision,
+        tool_name=summary.tool_name,
+        final_reason=summary.final_reason,
+        provenance_trust_summary=summary.provenance_trust_summary,
+        schema_versions_observed=summary.schema_versions_observed,
+    ).model_dump()
 
 
 

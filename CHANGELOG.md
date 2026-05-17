@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### Added
+
+- Replay API endpoints for trace reconstruction.
+- Replay summary API endpoint.
+- Swagger documentation for replay endpoints.
+
+### Notes
+
+- Replay UI remains future roadmap work.
+
 ## v0.5.0
 
 ### Added
@@ -24,6 +36,7 @@ All notable changes to this project will be documented in this file.
 - Replay is intentionally file-order based.
 - Distributed trace reconciliation is not yet implemented.
 - Replay UI remains future roadmap work.
+
 ## v0.4.0
 
 ### Added

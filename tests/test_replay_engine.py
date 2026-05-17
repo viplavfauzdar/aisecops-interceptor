@@ -230,3 +230,45 @@ def test_replay_summary_includes_provenance_trust_and_schema_versions(tmp_path) 
     assert summary.final_reason == "Unverified skill provenance"
     assert summary.provenance_trust_summary == {"trusted": 1, "unverified": 1}
     assert summary.schema_versions_observed == [AUDIT_SCHEMA_VERSION]
+
+
+def test_replay_trace_result_includes_execution_plans_and_final_fields(tmp_path) -> None:
+    audit_file = tmp_path / "audit.jsonl"
+    logger = AuditLogger(log_path=str(audit_file))
+    _write_event(
+        logger,
+        trace_id="run-123",
+        event_type="plan",
+        decision="pending",
+        tool_name="send_email",
+        execution_plan_id="plan-1",
+        decision_stage="plan",
+        reason="Execution plan created",
+    )
+    _write_event(
+        logger,
+        trace_id="run-123",
+        event_type="tool_blocked",
+        decision="blocked",
+        tool_name="send_email",
+        execution_plan_id="plan-1",
+        decision_stage="policy",
+        reason="Rule blocked tool 'send_email'",
+        provenance=[
+            InstructionProvenance(
+                source_type="skill",
+                source_name="untrusted_openclaw_skill",
+                trust_level="unverified",
+            )
+        ],
+    )
+
+    timeline = AuditReplayEngine().replay_trace(audit_file, "run-123")
+    result = AuditReplayEngine.build_trace_result(timeline)
+
+    assert result.trace_id == "run-123"
+    assert result.event_count == 2
+    assert result.execution_plan_ids == ["plan-1"]
+    assert result.final_decision == "blocked"
+    assert result.final_reason == "Rule blocked tool 'send_email'"
+    assert result.provenance_summary == {"unverified": 1}

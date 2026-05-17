@@ -2,8 +2,13 @@ import json
 
 from fastapi.testclient import TestClient
 
+from aisecops_interceptor.api import main as api_main
 from aisecops_interceptor.api.main import app, audit, tool_registry
-from aisecops_interceptor.core.audit import SinkFailure
+from aisecops_interceptor.core.audit import AuditLogger, SinkFailure
+from aisecops_interceptor.core.context import RuntimeContext
+from aisecops_interceptor.core.events import RuntimeEvent
+from aisecops_interceptor.core.models import InstructionProvenance
+from aisecops_interceptor.replay.engine import ReplayTimeline, ReplayTimelineEntry
 
 
 client = TestClient(app)
@@ -478,3 +483,249 @@ def test_audit_failures_endpoint_applies_limit() -> None:
         assert len(response.json()) == 1
     finally:
         _restore_sink_failure_state(original_failures, original_persisted)
+
+
+def _write_replay_event(
+    logger: AuditLogger,
+    *,
+    trace_id: str,
+    event_type: str,
+    decision: str,
+    tool_name: str | None = None,
+    execution_plan_id: str | None = None,
+    decision_stage: str | None = None,
+    reason: str | None = None,
+    provenance: list[InstructionProvenance] | None = None,
+) -> None:
+    logger.log(
+        RuntimeEvent.audit_event(
+            event_type=event_type,
+            decision=decision,
+            reason=reason,
+            stage="tool",
+            context=RuntimeContext(
+                agent_name="demo-agent",
+                tool_name=tool_name,
+                trace_id=trace_id,
+                provenance=provenance or [],
+            ),
+            execution_plan_id=execution_plan_id,
+            decision_stage=decision_stage,
+            provenance=provenance,
+        )
+    )
+
+
+def test_replay_endpoint_returns_full_replay(monkeypatch, tmp_path) -> None:
+    audit_file = tmp_path / "audit.jsonl"
+    logger = AuditLogger(log_path=str(audit_file))
+    _write_replay_event(
+        logger,
+        trace_id="run-123",
+        event_type="plan",
+        decision="pending",
+        tool_name="send_email",
+        execution_plan_id="plan-1",
+        decision_stage="plan",
+        reason="Execution plan created",
+    )
+    _write_replay_event(
+        logger,
+        trace_id="run-123",
+        event_type="tool_blocked",
+        decision="blocked",
+        tool_name="send_email",
+        execution_plan_id="plan-1",
+        decision_stage="policy",
+        reason="Rule blocked tool 'send_email'",
+        provenance=[
+            InstructionProvenance(
+                source_type="skill",
+                source_name="untrusted_openclaw_skill",
+                trust_level="unverified",
+            )
+        ],
+    )
+    monkeypatch.setattr(api_main, "replay_audit_file_path", lambda: str(audit_file))
+
+    response = client.get("/replay/run-123")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["trace_id"] == "run-123"
+    assert payload["event_count"] == 2
+    assert payload["execution_plan_ids"] == ["plan-1"]
+    assert payload["schema_versions_observed"] == ["0.5.0"]
+    assert payload["provenance_summary"] == {"unverified": 1}
+    assert payload["final_decision"] == "blocked"
+    assert payload["final_reason"] == "Rule blocked tool 'send_email'"
+    assert payload["timeline"][0]["event_id"].startswith("evt-")
+    assert payload["timeline"][0]["schema_version"] == "0.5.0"
+
+
+def test_replay_summary_endpoint_returns_summary(monkeypatch, tmp_path) -> None:
+    audit_file = tmp_path / "audit.jsonl"
+    logger = AuditLogger(log_path=str(audit_file))
+    _write_replay_event(
+        logger,
+        trace_id="run-123",
+        event_type="tool_blocked",
+        decision="blocked",
+        tool_name="send_email",
+        execution_plan_id="plan-1",
+        decision_stage="policy",
+        reason="Rule blocked tool 'send_email'",
+        provenance=[
+            InstructionProvenance(
+                source_type="skill",
+                source_name="untrusted_openclaw_skill",
+                trust_level="unverified",
+            )
+        ],
+    )
+    monkeypatch.setattr(api_main, "replay_audit_file_path", lambda: str(audit_file))
+
+    response = client.get("/replay/run-123/summary")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "trace_id": "run-123",
+        "event_count": 1,
+        "final_decision": "blocked",
+        "tool_name": "send_email",
+        "final_reason": "Rule blocked tool 'send_email'",
+        "provenance_trust_summary": {"unverified": 1},
+        "schema_versions_observed": ["0.5.0"],
+    }
+
+
+def test_replay_endpoint_returns_404_for_unknown_trace(monkeypatch, tmp_path) -> None:
+    audit_file = tmp_path / "audit.jsonl"
+    audit_file.write_text("", encoding="utf-8")
+    monkeypatch.setattr(api_main, "replay_audit_file_path", lambda: str(audit_file))
+
+    response = client.get("/replay/run-missing")
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "status": "blocked",
+        "decision": "block",
+        "reason": "No audit events found for trace_id 'run-missing'",
+        "data": None,
+        "trace": None,
+    }
+
+
+def test_replay_endpoint_includes_provenance_when_present(monkeypatch, tmp_path) -> None:
+    audit_file = tmp_path / "audit.jsonl"
+    logger = AuditLogger(log_path=str(audit_file))
+    _write_replay_event(
+        logger,
+        trace_id="run-123",
+        event_type="tool_blocked",
+        decision="blocked",
+        tool_name="send_email",
+        execution_plan_id="plan-1",
+        decision_stage="policy",
+        reason="Rule blocked tool 'send_email'",
+        provenance=[
+            InstructionProvenance(
+                source_type="skill",
+                source_name="untrusted_openclaw_skill",
+                trust_level="unverified",
+            )
+        ],
+    )
+    monkeypatch.setattr(api_main, "replay_audit_file_path", lambda: str(audit_file))
+
+    response = client.get("/replay/run-123")
+
+    assert response.status_code == 200
+    provenance = response.json()["timeline"][0]["provenance"]
+    assert provenance[0]["source_name"] == "untrusted_openclaw_skill"
+    assert provenance[0]["trust_level"] == "unverified"
+
+
+def test_replay_endpoint_tolerates_malformed_jsonl_lines(monkeypatch, tmp_path) -> None:
+    audit_file = tmp_path / "audit.jsonl"
+    logger = AuditLogger(log_path=str(audit_file))
+    _write_replay_event(
+        logger,
+        trace_id="run-123",
+        event_type="prompt_allowed",
+        decision="allowed",
+        decision_stage="input",
+        reason="Prompt accepted",
+    )
+    with audit_file.open("a", encoding="utf-8") as handle:
+        handle.write("{not-json}\n")
+    _write_replay_event(
+        logger,
+        trace_id="run-123",
+        event_type="final_output",
+        decision="allowed",
+        decision_stage="output",
+        reason="Response emitted",
+    )
+    monkeypatch.setattr(api_main, "replay_audit_file_path", lambda: str(audit_file))
+
+    response = client.get("/replay/run-123")
+
+    assert response.status_code == 200
+    assert response.json()["event_count"] == 2
+
+
+def test_replay_endpoint_uses_replay_engine(monkeypatch) -> None:
+    calls: list[tuple[str, str]] = []
+    timeline = ReplayTimeline(
+        trace_id="run-123",
+        entries=[
+            ReplayTimelineEntry(
+                timestamp="2026-05-17T00:00:00+00:00",
+                event_type="tool_blocked",
+                schema_version="0.5.0",
+                event_id="evt-demo123",
+                decision_stage="policy",
+                agent_name="demo-agent",
+                tool_name="send_email",
+                decision="blocked",
+                reason="Rule blocked tool 'send_email'",
+                provenance=[],
+                execution_plan_id="plan-1",
+            )
+        ],
+        grouped_entries={"plan-1": []},
+    )
+
+    def fake_replay_trace(audit_file: str, trace_id: str):
+        calls.append((audit_file, trace_id))
+        return timeline
+
+    monkeypatch.setattr(api_main, "replay_audit_file_path", lambda: "logs/audit.jsonl")
+    monkeypatch.setattr(api_main.replay_engine, "replay_trace", fake_replay_trace)
+
+    response = client.get("/replay/run-123")
+
+    assert response.status_code == 200
+    assert calls == [("logs/audit.jsonl", "run-123")]
+
+
+def test_openapi_includes_replay_examples() -> None:
+    response = client.get("/openapi.json")
+    assert response.status_code == 200
+    schema = response.json()
+
+    replay_operation = schema["paths"]["/replay/{trace_id}"]["get"]
+    replay_summary_operation = schema["paths"]["/replay/{trace_id}/summary"]["get"]
+
+    replay_example = replay_operation["responses"]["200"]["content"]["application/json"]["example"]
+    assert replay_example["trace_id"] == "run-123"
+    assert replay_example["timeline"][0]["event_id"] == "evt-abc123"
+
+    replay_not_found = replay_operation["responses"]["404"]["content"]["application/json"]["example"]
+    assert replay_not_found["status"] == "blocked"
+    assert replay_not_found["decision"] == "block"
+
+    replay_summary_example = replay_summary_operation["responses"]["200"]["content"]["application/json"]["example"]
+    assert replay_summary_example["trace_id"] == "run-123"
+    assert replay_summary_example["schema_versions_observed"] == ["0.5.0"]
