@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict
 
 from fastapi import Body, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from fastapi.responses import JSONResponse, RedirectResponse
 
@@ -28,6 +29,13 @@ from aisecops_interceptor.replay.engine import AuditFileNotFoundError, AuditRepl
 from aisecops_interceptor import __version__
 
 app = FastAPI(title="AISecOps Interceptor", version=__version__)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 policy = PolicyEngine.from_yaml_file()
 audit = AuditLogger(log_path=DEFAULT_AUDIT_LOG_PATH)
 approvals = ApprovalStore(store_path="audit/approvals.jsonl")
@@ -422,6 +430,33 @@ REPLAY_SUMMARY_RESPONSES = {
     404: REPLAY_RESPONSES[404],
 }
 
+REPLAY_LIST_RESPONSES = {
+    200: {
+        "description": "Replay trace summaries for the audit log",
+        "content": {
+            "application/json": {
+                "example": {
+                    "traces": [
+                        {
+                            "trace_id": "run-123",
+                            "event_count": 2,
+                            "final_decision": "blocked",
+                            "tool_name": "send_email",
+                            "final_reason": "Rule blocked tool 'send_email'",
+                            "provenance_trust_summary": {"unverified": 1},
+                            "schema_versions_observed": ["0.5.0"],
+                            "first_seen": "2026-05-17T00:00:00+00:00",
+                            "last_seen": "2026-05-17T00:00:05+00:00",
+                        }
+                    ],
+                    "count": 1,
+                    "limit": 50,
+                }
+            }
+        },
+    }
+}
+
 
 class ExecuteRequest(BaseModel):
     agent_name: str = Field(..., examples=["sales_agent"])
@@ -620,6 +655,40 @@ def root() -> RedirectResponse:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/replay", responses=REPLAY_LIST_RESPONSES)
+def replay_trace_list(
+    limit: int = 50,
+    decision: str | None = None,
+    tool_name: str | None = None,
+    provenance_trust: str | None = None,
+) -> dict:
+    summaries = replay_engine.list_traces(
+        replay_audit_file_path(),
+        limit=limit,
+        decision=decision,
+        tool_name=tool_name,
+        provenance_trust=provenance_trust,
+    )
+    return {
+        "traces": [
+            {
+                "trace_id": summary.trace_id,
+                "event_count": summary.event_count,
+                "final_decision": summary.final_decision,
+                "tool_name": summary.tool_name,
+                "final_reason": summary.final_reason,
+                "provenance_trust_summary": summary.provenance_trust_summary,
+                "schema_versions_observed": summary.schema_versions_observed,
+                "first_seen": summary.first_seen,
+                "last_seen": summary.last_seen,
+            }
+            for summary in summaries
+        ],
+        "count": len(summaries),
+        "limit": limit,
+    }
 
 
 @app.get("/replay/{trace_id}", responses=REPLAY_RESPONSES, response_model=ReplayTraceResponseModel)

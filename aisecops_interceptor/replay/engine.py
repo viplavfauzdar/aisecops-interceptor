@@ -74,6 +74,8 @@ class ReplaySummary:
     final_reason: str | None
     provenance_trust_summary: dict[str, int]
     schema_versions_observed: list[str]
+    first_seen: str | None = None
+    last_seen: str | None = None
 
 
 @dataclass(slots=True)
@@ -89,15 +91,14 @@ class ReplayTraceResult:
 
 
 class AuditReplayEngine:
-    def replay_trace(self, audit_file: str | Path, trace_id: str) -> ReplayTimeline:
+    @staticmethod
+    def _load_events(audit_file: str | Path) -> tuple[list[RuntimeEvent], list[ReplayWarning]]:
         path = Path(audit_file)
         if not path.exists():
             raise AuditFileNotFoundError(f"Audit file not found: {path}")
 
-        entries: list[ReplayTimelineEntry] = []
+        events: list[RuntimeEvent] = []
         warnings: list[ReplayWarning] = []
-        grouped: dict[str | None, list[ReplayTimelineEntry]] = {}
-
         with path.open("r", encoding="utf-8") as handle:
             for line_number, raw_line in enumerate(handle, start=1):
                 line = raw_line.strip()
@@ -106,7 +107,7 @@ class AuditReplayEngine:
 
                 try:
                     payload = json.loads(line)
-                    event = RuntimeEvent.from_dict(payload)
+                    events.append(RuntimeEvent.from_dict(payload))
                 except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
                     warnings.append(
                         ReplayWarning(
@@ -115,13 +116,20 @@ class AuditReplayEngine:
                         )
                     )
                     continue
+        return events, warnings
 
-                if event.trace_id != trace_id:
-                    continue
+    def replay_trace(self, audit_file: str | Path, trace_id: str) -> ReplayTimeline:
+        events, warnings = self._load_events(audit_file)
+        entries: list[ReplayTimelineEntry] = []
+        grouped: dict[str | None, list[ReplayTimelineEntry]] = {}
 
-                entry = ReplayTimelineEntry.from_event(event)
-                entries.append(entry)
-                grouped.setdefault(entry.execution_plan_id, []).append(entry)
+        for event in events:
+            if event.trace_id != trace_id:
+                continue
+
+            entry = ReplayTimelineEntry.from_event(event)
+            entries.append(entry)
+            grouped.setdefault(entry.execution_plan_id, []).append(entry)
 
         if not entries:
             raise TraceNotFoundError(f"No audit events found for trace_id '{trace_id}'")
@@ -156,6 +164,8 @@ class AuditReplayEngine:
             final_reason=final_entry.reason if final_entry is not None else None,
             provenance_trust_summary=trust_summary,
             schema_versions_observed=schema_versions,
+            first_seen=timeline.entries[0].timestamp if timeline.entries else None,
+            last_seen=timeline.entries[-1].timestamp if timeline.entries else None,
         )
 
     @staticmethod
@@ -180,3 +190,51 @@ class AuditReplayEngine:
             final_decision=summary.final_decision,
             final_reason=summary.final_reason,
         )
+
+    def list_traces(
+        self,
+        audit_file: str | Path,
+        *,
+        limit: int = 50,
+        decision: str | None = None,
+        tool_name: str | None = None,
+        provenance_trust: str | None = None,
+    ) -> list[ReplaySummary]:
+        try:
+            events, _warnings = self._load_events(audit_file)
+        except AuditFileNotFoundError:
+            return []
+
+        traces: dict[str, list[RuntimeEvent]] = {}
+        for event in events:
+            if event.trace_id is None:
+                continue
+            traces.setdefault(event.trace_id, []).append(event)
+
+        summaries: list[ReplaySummary] = []
+        for trace_id, trace_events in traces.items():
+            grouped_entries: dict[str | None, list[ReplayTimelineEntry]] = {}
+            entries = [ReplayTimelineEntry.from_event(event) for event in trace_events]
+            for entry in entries:
+                grouped_entries.setdefault(entry.execution_plan_id, []).append(entry)
+            summary = self.summarize_timeline(
+                ReplayTimeline(
+                    trace_id=trace_id,
+                    entries=entries,
+                    grouped_entries=grouped_entries,
+                )
+            )
+            summaries.append(summary)
+
+        filtered = [
+            summary
+            for summary in summaries
+            if (decision is None or summary.final_decision == decision)
+            and (tool_name is None or summary.tool_name == tool_name)
+            and (
+                provenance_trust is None
+                or provenance_trust in summary.provenance_trust_summary
+            )
+        ]
+        filtered.sort(key=lambda item: item.last_seen or "", reverse=True)
+        return filtered[:limit]

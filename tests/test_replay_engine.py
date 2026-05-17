@@ -272,3 +272,59 @@ def test_replay_trace_result_includes_execution_plans_and_final_fields(tmp_path)
     assert result.final_decision == "blocked"
     assert result.final_reason == "Rule blocked tool 'send_email'"
     assert result.provenance_summary == {"unverified": 1}
+
+
+def test_list_traces_filters_and_applies_limit(tmp_path) -> None:
+    audit_file = tmp_path / "audit.jsonl"
+    logger = AuditLogger(log_path=str(audit_file))
+    _write_event(
+        logger,
+        trace_id="run-1",
+        event_type="tool_blocked",
+        decision="blocked",
+        tool_name="send_email",
+        decision_stage="policy",
+        reason="Rule blocked tool 'send_email'",
+        provenance=[
+            InstructionProvenance(
+                source_type="skill",
+                source_name="untrusted_openclaw_skill",
+                trust_level="unverified",
+            )
+        ],
+    )
+    _write_event(
+        logger,
+        trace_id="run-2",
+        event_type="tool_allowed",
+        decision="allowed",
+        tool_name="read_customer",
+        decision_stage="decision",
+        reason="Allowed by policy",
+        provenance=[
+            InstructionProvenance(
+                source_type="system_prompt",
+                source_name="ops_runbook",
+                trust_level="trusted",
+            )
+        ],
+    )
+
+    engine = AuditReplayEngine()
+    summaries = engine.list_traces(audit_file, limit=1)
+    blocked = engine.list_traces(audit_file, decision="blocked")
+    by_tool = engine.list_traces(audit_file, tool_name="read_customer")
+    by_trust = engine.list_traces(audit_file, provenance_trust="unverified")
+
+    assert len(summaries) == 1
+    assert blocked[0].trace_id == "run-1"
+    assert by_tool[0].trace_id == "run-2"
+    assert by_trust[0].trace_id == "run-1"
+
+
+def test_list_traces_returns_empty_for_missing_audit_file(tmp_path) -> None:
+    audit_file = tmp_path / "missing.jsonl"
+
+    summaries = AuditReplayEngine().list_traces(audit_file)
+
+    assert summaries == []

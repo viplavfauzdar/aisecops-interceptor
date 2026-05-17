@@ -475,18 +475,21 @@ The replay API exposes the same trace reconstruction and summary logic used by t
 It exists to support remote investigation workflows now, Swagger shows these replay endpoints for local exploration, and it prepares the future replay UI without changing the underlying JSONL replay engine.
 
 Endpoints:
+- `GET /replay`
 - `GET /replay/{trace_id}`
 - `GET /replay/{trace_id}/summary`
 
 Examples:
 
 ```bash
+curl http://127.0.0.1:8000/replay
 curl http://127.0.0.1:8000/replay/<trace_id>
 curl http://127.0.0.1:8000/replay/<trace_id>/summary
 ```
 
 
-The summary endpoint is useful for quick audit review, while the full replay endpoint returns the ordered timeline, execution plan grouping context, schema versions observed, and provenance summary.
+`GET /replay` lists trace summaries for the future replay UI, `GET /replay/{trace_id}` returns the timeline view, and `GET /replay/{trace_id}/summary` returns the concise audit view.
+Local CORS support is enabled for frontend development from `http://localhost:5173` and `http://127.0.0.1:5173`.
 
 ### Replay screenshots
 
