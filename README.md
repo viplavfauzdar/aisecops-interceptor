@@ -22,6 +22,7 @@
 - [Repository layout](#repository-layout)
 - [Full local quick start](#full-local-quick-start)
 - [API: Execute vs Explain](#api-execute-vs-explain)
+- [Interactive API docs](#interactive-api-docs)
 - [Architecture direction](#architecture-direction)
 
 AISecOps Interceptor provides a framework-agnostic control plane to detect prompt injections, prevent secret leakage, and enforce human-in-the-loop approvals before your agents execute dangerous tools.
@@ -873,6 +874,36 @@ python -m examples.langgraph_style_demo
 python examples/openclaw_demo.py
 python -m examples.policy_bundle_demo
 ```
+
+## Interactive API docs
+
+The FastAPI wrapper exposes an interactive Swagger UI for local testing and demos.
+
+Start the API:
+
+```bash
+uvicorn aisecops_interceptor.api.main:app --reload
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+The Swagger UI is the fastest way to inspect request and response shapes for the runtime API.
+It is useful for local validation, demo walkthroughs, and checking structured examples without writing a client first.
+
+Available API functionality in the docs includes:
+- `GET /health` for a basic runtime health check
+- `POST /execute` for full interception, approval, and execution flow
+- `POST /explain` for non-executing decision analysis
+- `GET /audit` for persisted runtime event inspection
+- `GET /audit/failures` for sink delivery failure inspection
+
+Swagger screenshot placeholder:
+
+![Swagger API docs placeholder](docs/swagger-api.png)
 
 ## API: Execute vs Explain
 
