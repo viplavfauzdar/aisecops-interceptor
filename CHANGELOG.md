@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.5.0
+
+### Added
+
+- Replay engine CLI for structured JSONL audit events.
+- Replay reconstruction by trace_id.
+- Replay grouping by execution_plan_id.
+- Replay summary mode.
+- Audit event schema versioning.
+- Stable audit event identifiers (`event_id`).
+
+### Changed
+
+- New audit events now include `schema_version`.
+- New audit events now include unique `event_id` values.
+- Replay engine tolerates older audit records without schema metadata.
+
+### Notes
+
+- Replay is intentionally file-order based.
+- Distributed trace reconciliation is not yet implemented.
+- Replay UI remains future roadmap work.
 ## v0.4.0
 
 ### Added

@@ -7,7 +7,7 @@ import httpx
 from aisecops_interceptor.core.audit import AuditLogger, SinkFailure
 from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.event_sink import FileEventSink, InMemoryEventSink, WebhookEventSink
-from aisecops_interceptor.core.events import RuntimeEvent
+from aisecops_interceptor.core.events import AUDIT_SCHEMA_VERSION, EVENT_ID_PREFIX, RuntimeEvent
 
 
 def test_audit_logger_emits_to_all_sinks(tmp_path) -> None:
@@ -66,10 +66,40 @@ def test_audit_logger_assigns_trace_id_and_persists_unified_schema(tmp_path) -> 
 
     persisted = list(logger.persisted_events())
     assert len(persisted) == 1
-    assert persisted[0].schema_version == "1.0"
+    assert persisted[0].schema_version == AUDIT_SCHEMA_VERSION
+    assert persisted[0].event_id is not None
+    assert persisted[0].event_id.startswith(EVENT_ID_PREFIX)
     assert persisted[0].trace_id is not None
     assert persisted[0].audit_kind == "plan"
     assert persisted[0].payload == {"dry_run": False}
+
+
+def test_audit_logger_assigns_unique_event_ids(tmp_path) -> None:
+    logger = AuditLogger(log_path=str(tmp_path / "runtime-events.jsonl"))
+    context = RuntimeContext(agent_name="demo-agent", tool_name="read_customer")
+
+    logger.log(
+        RuntimeEvent.tool_event(
+            event_type="tool_allowed",
+            decision="allowed",
+            context=context,
+            allowed=True,
+            reason="Allowed by policy",
+        )
+    )
+    logger.log(
+        RuntimeEvent.tool_event(
+            event_type="tool_executed",
+            decision="allowed",
+            context=context,
+            allowed=True,
+            reason="Tool executed",
+        )
+    )
+
+    persisted = list(logger.persisted_events())
+    assert len(persisted) == 2
+    assert persisted[0].event_id != persisted[1].event_id
 
 
 def test_webhook_event_sink_posts_runtime_event_json() -> None:

@@ -22,6 +22,7 @@
 - [Repository layout](#repository-layout)
 - [Full local quick start](#full-local-quick-start)
 - [API: Execute vs Explain](#api-execute-vs-explain)
+- [Interactive API docs](#interactive-api-docs)
 - [Architecture direction](#architecture-direction)
 
 AISecOps Interceptor provides a framework-agnostic control plane to detect prompt injections, prevent secret leakage, and enforce human-in-the-loop approvals before your agents execute dangerous tools.
@@ -450,6 +451,22 @@ That provenance is included in replayable JSONL audit events, which prepares fut
 AISecOps can evaluate instruction origin during policy enforcement.
 Policies may deny or escalate based on provenance trust or provenance source type, which is useful for malicious skills, retrieval poisoning, and multi-agent trust boundaries.
 
+### Replay audit events
+
+AISecOps can replay one recorded `trace_id` from structured JSONL audit logs into a human-readable timeline.
+This helps with forensics and governance by reconstructing what was observed, planned, evaluated, and executed for a single run.
+
+```bash
+python -m aisecops_interceptor.replay.cli --trace-id <trace_id> --audit-file logs/audit.jsonl
+```
+
+`aisecops-replay --trace-id <trace_id> --audit-file logs/audit.jsonl --summary`
+prints a concise run summary for fast audit review.
+
+### Audit schema stability
+
+Starting in `v0.5.0`, new audit events include a stable `schema_version` and unique `event_id`.
+Replay remains backward-compatible with older JSONL audit records that do not carry that metadata.
 The `/audit` endpoint supports optional query parameters: `event_type`, `stage`, `agent_name`, `tool_name`, `correlation_id`, and `limit`.
 `AuditLogger` can also emit the same `RuntimeEvent` records to multiple sinks, such as JSONL persistence and additional in-memory or external streaming adapters.
 Supported sink types include file-backed JSONL persistence, in-memory collection, and webhook delivery to external HTTP endpoints.
@@ -856,6 +873,36 @@ python -m examples.langgraph_style_demo
 python examples/openclaw_demo.py
 python -m examples.policy_bundle_demo
 ```
+
+## Interactive API docs
+
+The FastAPI wrapper exposes an interactive Swagger UI for local testing and demos.
+
+Start the API:
+
+```bash
+uvicorn aisecops_interceptor.api.main:app --reload
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+The Swagger UI is the fastest way to inspect request and response shapes for the runtime API.
+It is useful for local validation, demo walkthroughs, and checking structured examples without writing a client first.
+
+Available API functionality in the docs includes:
+- `GET /health` for a basic runtime health check
+- `POST /execute` for full interception, approval, and execution flow
+- `POST /explain` for non-executing decision analysis
+- `GET /audit` for persisted runtime event inspection
+- `GET /audit/failures` for sink delivery failure inspection
+
+Swagger screenshot placeholder:
+
+![Swagger API docs placeholder](docs/swagger-api.png)
 
 ## API: Execute vs Explain
 

@@ -7,7 +7,7 @@ from typing import Iterable
 from uuid import uuid4
 
 from aisecops_interceptor.core.event_sink import EventSink, FileEventSink, InMemoryEventSink
-from aisecops_interceptor.core.events import RuntimeEvent
+from aisecops_interceptor.core.events import AUDIT_SCHEMA_VERSION, EVENT_ID_PREFIX, RuntimeEvent
 
 
 DEFAULT_AUDIT_LOG_PATH = "logs/audit.jsonl"
@@ -94,9 +94,17 @@ class AuditLogger:
         if event.provenance is None and event.context.provenance:
             event.provenance = list(event.context.provenance)
 
+    @staticmethod
+    def _ensure_schema_metadata(event: RuntimeEvent) -> None:
+        if event.schema_version is None:
+            event.schema_version = AUDIT_SCHEMA_VERSION
+        if event.event_id is None:
+            event.event_id = f"{EVENT_ID_PREFIX}{uuid4().hex}"
+
     def log(self, event: RuntimeEvent) -> None:
         self._ensure_trace_id(event)
         self._ensure_event_replay_metadata(event)
+        self._ensure_schema_metadata(event)
         for sink in self.sinks:
             try:
                 sink.emit(event)
