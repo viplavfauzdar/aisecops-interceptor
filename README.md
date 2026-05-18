@@ -1171,3 +1171,29 @@ Typical integration targets include:
 These frameworks orchestrate agents, while AISecOps Interceptor governs **runtime security, execution control, and auditability**.
 
 The long‑term goal is a portable runtime security layer that can protect any agent framework with minimal adapter code.
+
+---
+
+## Replay Audit UI
+
+Located in `./dashboard/`.
+
+### Setup
+
+```bash
+cd dashboard
+cp .env.example .env
+npm install
+npm run dev
+```
+
+### Environment
+
+| Variable | Default | Description |
+|---|---|---|
+| `VITE_API_BASE_URL` | `http://localhost:8000` | Backend base URL |
+
+### Screens
+
+- `/` — Trace list with filters (decision, tool name, provenance trust)
+- `/trace/:traceId` — Event timeline with summary panel and event detail drawer
