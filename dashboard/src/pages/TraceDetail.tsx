@@ -4,13 +4,19 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, RefreshCw, Copy } from 'lucide-react'
 import { fetchTrace, fetchTraceSummary, type TraceEvent } from '../api/replayClient'
 import { EventDrawer } from '../components/EventDrawer'
+import { ExecutionGraph } from '../components/ExecutionGraph'
 import { SummaryCards } from '../components/SummaryCards'
 import { TimelineEvent } from '../components/TimelineEvent'
 import { copyToClipboard } from '../lib/clipboard'
 
+type Tab = 'timeline' | 'graph'
+
+const TABS: Tab[] = ['timeline', 'graph']
+
 export function TraceDetail() {
   const { traceId } = useParams<{ traceId: string }>()
   const [selectedEvent, setSelectedEvent] = useState<TraceEvent | null>(null)
+  const [activeTab, setActiveTab] = useState<Tab>('timeline')
 
   const traceQuery = useQuery({
     queryKey: ['trace', traceId],
@@ -85,16 +91,48 @@ export function TraceDetail() {
         )}
 
         {!isLoading && !isError && traceQuery.data && (
-          <div>
-            {traceQuery.data.timeline.map((event, idx) => (
-              <TimelineEvent
-                key={event.event_id ?? idx}
-                event={event}
-                isLast={idx === traceQuery.data!.timeline.length - 1}
-                onSelect={setSelectedEvent}
+          <>
+            {/* Tab bar */}
+            <div className="flex gap-0 border-b border-slate-800 mb-4">
+              {TABS.map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={[
+                    'px-4 py-2 text-xs font-mono uppercase tracking-wider border-b-2 -mb-px',
+                    activeTab === tab
+                      ? 'border-slate-300 text-slate-100'
+                      : 'border-transparent text-slate-500 hover:text-slate-300',
+                  ].join(' ')}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+
+            {activeTab === 'timeline' && (
+              <div>
+                {traceQuery.data.timeline.map((event, idx) => (
+                  <TimelineEvent
+                    key={event.event_id ?? idx}
+                    event={event}
+                    isLast={idx === traceQuery.data!.timeline.length - 1}
+                    onSelect={setSelectedEvent}
+                  />
+                ))}
+              </div>
+            )}
+
+            {activeTab === 'graph' && (
+              <ExecutionGraph
+                events={traceQuery.data.timeline}
+                onNodeClick={(eventId) => {
+                  const ev = traceQuery.data!.timeline.find(e => e.event_id === eventId)
+                  if (ev) setSelectedEvent(ev)
+                }}
               />
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
 
