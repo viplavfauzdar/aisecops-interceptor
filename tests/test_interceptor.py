@@ -4,7 +4,7 @@ from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.events import RuntimeEvent
 from aisecops_interceptor.core.exceptions import ApprovalRequiredError, PolicyViolationError
 from aisecops_interceptor.core.interceptor import AgentInterceptor
-from aisecops_interceptor.core.models import DryRunResult, InterceptionRequest, ToolCall
+from aisecops_interceptor.core.models import DryRunResult, InstructionProvenance, InterceptionRequest, ToolCall
 from aisecops_interceptor.core.policy import PolicyEngine
 
 
@@ -122,6 +122,34 @@ def test_intercept_supports_runtime_context_contract() -> None:
     assert all(isinstance(event, RuntimeEvent) for event in events)
     assert [event.event_type for event in events] == ["plan", "decision", "tool_call", "tool_allowed", "tool_executed", "final_output"]
     assert len({event.trace_id for event in events}) == 1
+
+
+def test_intercept_propagates_provenance_to_runtime_events() -> None:
+    interceptor = make_interceptor()
+    request = InterceptionRequest(
+        context=RuntimeContext(
+            agent_name="sales_agent",
+            tool_name="read_customer",
+            arguments={"customer_id": "456"},
+            provenance=[
+                InstructionProvenance(
+                    source_type="skill",
+                    source_name="untrusted_openclaw_skill",
+                    trust_level="unverified",
+                )
+            ],
+        ),
+        tool_registry={"read_customer": lambda customer_id: {"customer_id": customer_id}},
+    )
+
+    result = interceptor.intercept(request)
+
+    assert result == {"customer_id": "456"}
+    events = list(interceptor.audit_logger.events())
+    assert events
+    assert all(event.provenance for event in events)
+    assert all(event.provenance[0].source_name == "untrusted_openclaw_skill" for event in events)
+    assert all(event.provenance[0].trust_level == "unverified" for event in events)
 
 
 def test_intercept_blocks_high_sensitivity_context_end_to_end() -> None:

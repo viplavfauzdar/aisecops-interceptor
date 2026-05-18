@@ -25,6 +25,7 @@ class BaseRuntimeAdapter(ABC):
         environment: str = "dev",
         session_id: str | None = None,
         correlation_id: str | None = None,
+        provenance: list[Any] | None = None,
         tags: dict[str, str] | None = None,
     ) -> RuntimeContext:
         return RuntimeContext(
@@ -36,6 +37,7 @@ class BaseRuntimeAdapter(ABC):
             environment=environment,
             session_id=session_id,
             correlation_id=correlation_id,
+            provenance=provenance or [],
             tags=tags or {},
         )
 

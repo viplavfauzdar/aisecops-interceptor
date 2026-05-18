@@ -45,6 +45,7 @@ class OpenClawToolRunnerAdapter(BaseRuntimeAdapter):
             environment=str(payload.get("environment") or self.environment),
             session_id=str(payload.get("session_id")) if payload.get("session_id") is not None else None,
             correlation_id=str(payload.get("correlation_id")) if payload.get("correlation_id") is not None else None,
+            provenance=list(payload.get("provenance") or []),
         )
         return self.intercept_call(
             context=context,

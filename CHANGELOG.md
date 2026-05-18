@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### Added
+
+- Replay trace listing API for future replay UI.
+- Replay API filters for decision, tool name, and provenance trust.
+- Local frontend CORS support for replay UI development.
+- Default API provenance for execution requests.
+- End-to-end provenance propagation into audit and replay APIs.
+
 ## v0.6.0
 
 ### Added
