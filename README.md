@@ -446,6 +446,8 @@ Tool-stage auditing now records plan creation, decision evaluation, tool-call re
 
 AISecOps records where instructions came from, such as prompts, skills, retrieved content, memory, or tool results.
 That provenance is included in replayable JSONL audit events, which prepares future replay and debug tooling without changing current enforcement behavior.
+API execution requests without explicit provenance are tagged as `user_prompt` / `api_request` / `internal` by default so normal Swagger and local API traces still produce meaningful replay metadata.
+Callers can also pass explicit provenance for skills, retrieval chunks, memory, tool results, or agent messages, and the replay UI uses that data to render provenance badges.
 
 ### Provenance-aware policy enforcement
 

@@ -18,6 +18,7 @@ from aisecops_interceptor.core.models import (
     DryRunResultModel,
     ExplainTraceModel,
     InterceptionRequest,
+    InstructionProvenance,
     ReplaySummaryResponseModel,
     ReplayTimelineEntryModel,
     ReplayTraceResponseModel,
@@ -464,6 +465,7 @@ class ExecuteRequest(BaseModel):
     arguments: dict = Field(default_factory=dict)
     approval_id: str | None = None
     dry_run: bool = False
+    provenance: list[InstructionProvenance] = Field(default_factory=list)
 
 
 class ApprovalReviewRequest(BaseModel):
@@ -477,6 +479,25 @@ class OpenClawExecuteRequest(BaseModel):
     arguments: dict = Field(default_factory=dict)
     approval_id: str | None = None
     correlation_id: str | None = None
+    provenance: list[InstructionProvenance] = Field(default_factory=list)
+
+
+def _default_api_provenance() -> list[InstructionProvenance]:
+    return [
+        InstructionProvenance(
+            source_type="user_prompt",
+            source_name="api_request",
+            trust_level="internal",
+        )
+    ]
+
+
+def _request_provenance(
+    provenance: list[InstructionProvenance] | None,
+) -> list[InstructionProvenance]:
+    if provenance:
+        return list(provenance)
+    return _default_api_provenance()
 
 
 def _trace_payload(trace) -> ExplainTraceModel:
@@ -758,6 +779,7 @@ def list_approvals() -> list[dict]:
 @app.post("/openclaw/execute")
 def execute_openclaw(request: OpenClawExecuteRequest) -> dict:
     payload = request.model_dump(exclude_none=True)
+    payload["provenance"] = [item.to_dict() for item in _request_provenance(request.provenance)]
     try:
         result = openclaw_adapter.run(payload, tool_registry=tool_registry, approval_id=request.approval_id)
         return {"status": "allowed", "result": result}
@@ -775,6 +797,7 @@ def interceptor_context_from_request(request: ExecuteRequest) -> RuntimeContext:
         tool_name=request.tool_name,
         arguments=request.arguments,
         framework="legacy",
+        provenance=_request_provenance(request.provenance),
     )
 
 

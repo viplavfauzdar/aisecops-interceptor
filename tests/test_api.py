@@ -43,6 +43,15 @@ def _restore_sink_failure_state(failures: list[SinkFailure], persisted: str | No
     audit.sink_failure_log_path.write_text(persisted, encoding="utf-8")
 
 
+def _use_temp_api_audit_logger(monkeypatch, tmp_path) -> AuditLogger:
+    audit_file = tmp_path / "api-audit.jsonl"
+    logger = AuditLogger(log_path=str(audit_file))
+    monkeypatch.setattr(api_main, "audit", logger)
+    monkeypatch.setattr(api_main.interceptor, "audit_logger", logger)
+    monkeypatch.setattr(api_main, "replay_audit_file_path", lambda: str(audit_file))
+    return logger
+
+
 def test_execute_endpoint_allows_and_serializes_audit_event() -> None:
     response = client.post(
         "/execute",
@@ -67,6 +76,94 @@ def test_execute_endpoint_allows_and_serializes_audit_event() -> None:
         event["tool_name"] == "read_customer" and event["event_type"] == "tool_executed"
         for event in audit_response.json()
     )
+
+
+def test_execute_endpoint_defaults_api_provenance_for_audit_and_replay(monkeypatch, tmp_path) -> None:
+    _use_temp_api_audit_logger(monkeypatch, tmp_path)
+
+    response = client.post(
+        "/execute",
+        json={
+            "agent_name": "sales_agent",
+            "tool_name": "read_customer",
+            "arguments": {"customer_id": "123"},
+        },
+    )
+
+    assert response.status_code == 200
+
+    audit_response = client.get("/audit", params={"tool_name": "read_customer"})
+    assert audit_response.status_code == 200
+    events = audit_response.json()
+    assert events
+    assert all(event["provenance"] for event in events)
+    assert all(event["provenance"][0]["source_type"] == "user_prompt" for event in events)
+    assert all(event["provenance"][0]["source_name"] == "api_request" for event in events)
+    assert all(event["provenance"][0]["trust_level"] == "internal" for event in events)
+
+    trace_id = events[0]["trace_id"]
+    replay_response = client.get(f"/replay/{trace_id}")
+    assert replay_response.status_code == 200
+    replay_payload = replay_response.json()
+    assert replay_payload["provenance_summary"]["internal"] >= 1
+    assert all(entry["provenance"] for entry in replay_payload["timeline"])
+    assert all(entry["provenance"][0]["source_name"] == "api_request" for entry in replay_payload["timeline"])
+
+    summary_response = client.get(f"/replay/{trace_id}/summary")
+    assert summary_response.status_code == 200
+    assert summary_response.json()["provenance_trust_summary"]["internal"] >= 1
+
+    list_response = client.get("/replay")
+    assert list_response.status_code == 200
+    assert list_response.json()["traces"][0]["provenance_trust_summary"]["internal"] >= 1
+
+
+def test_execute_endpoint_preserves_supplied_provenance(monkeypatch, tmp_path) -> None:
+    _use_temp_api_audit_logger(monkeypatch, tmp_path)
+
+    response = client.post(
+        "/execute",
+        json={
+            "agent_name": "sales_agent",
+            "tool_name": "read_customer",
+            "arguments": {"customer_id": "123"},
+            "provenance": [
+                {
+                    "source_type": "skill",
+                    "source_name": "untrusted_openclaw_skill",
+                    "trust_level": "unverified",
+                },
+                {
+                    "source_type": "retrieval_chunk",
+                    "source_name": "wiki-snippet",
+                    "trust_level": "external",
+                },
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+
+    audit_response = client.get("/audit", params={"tool_name": "read_customer"})
+    events = audit_response.json()
+    assert events
+    provenance = events[0]["provenance"]
+    assert provenance[0]["source_name"] == "untrusted_openclaw_skill"
+    assert provenance[0]["trust_level"] == "unverified"
+    assert provenance[1]["source_type"] == "retrieval_chunk"
+    assert provenance[1]["trust_level"] == "external"
+
+    trace_id = events[0]["trace_id"]
+    replay_response = client.get(f"/replay/{trace_id}")
+    assert replay_response.status_code == 200
+    timeline_provenance = replay_response.json()["timeline"][0]["provenance"]
+    assert timeline_provenance[0]["source_name"] == "untrusted_openclaw_skill"
+    assert timeline_provenance[1]["source_name"] == "wiki-snippet"
+
+    summary_response = client.get(f"/replay/{trace_id}/summary")
+    assert summary_response.status_code == 200
+    assert summary_response.json()["provenance_trust_summary"]["unverified"] >= 1
+    assert summary_response.json()["provenance_trust_summary"]["external"] >= 1
 
 
 def test_approval_flow_serializes_pending_requests() -> None:
