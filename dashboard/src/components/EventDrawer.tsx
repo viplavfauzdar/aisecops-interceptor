@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { X } from 'lucide-react'
 import type { TraceEvent } from '../api/replayClient'
 import { copyToClipboard } from '../lib/clipboard'
+import { ProvenanceBadge } from './ProvenanceBadge'
 
 interface EventDrawerProps {
   event: TraceEvent | null
@@ -40,6 +41,14 @@ export function EventDrawer({ event, onClose }: EventDrawerProps) {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {event.event_id && (
+              <button
+                onClick={() => copyToClipboard(event.event_id!)}
+                className="text-xs font-mono bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded-sm"
+              >
+                Copy ID
+              </button>
+            )}
             <button
               onClick={() => copyToClipboard(JSON.stringify(event, null, 2))}
               className="text-xs font-mono bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded-sm transition-colors"
@@ -55,6 +64,14 @@ export function EventDrawer({ event, onClose }: EventDrawerProps) {
             </button>
           </div>
         </div>
+
+        {/* Provenance section */}
+        {Array.isArray(event.provenance) && event.provenance.length > 0 && (
+          <div className="px-4 py-3 border-b border-slate-800">
+            <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Provenance</p>
+            <ProvenanceBadge entries={event.provenance} maxVisible={8} />
+          </div>
+        )}
 
         {/* JSON body */}
         <div className="flex-1 overflow-auto p-4">
