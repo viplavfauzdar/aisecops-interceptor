@@ -24,6 +24,7 @@
 - [API: Execute vs Explain](#api-execute-vs-explain)
 - [Interactive API docs](#interactive-api-docs)
 - [Replay Audit UI](#replay-audit-ui)
+- [Dashboard](#dashboard)
 - [Replay screenshots](#replay-screenshots)
 - [Architecture direction](#architecture-direction)
 
@@ -508,6 +509,8 @@ It supports provenance-aware replay analysis across these current screens:
 - provenance badges
 - decision summaries
 
+For frontend-specific setup, implementation details, and development workflow, see the [Dashboard README](dashboard/README.md).
+
 ### Setup
 
 ```bash
@@ -518,6 +521,21 @@ npm run dev
 ```
 
 The frontend expects the backend API to be running at `http://localhost:8000`.
+
+## Dashboard
+
+The dashboard is the frontend investigation console for AISecOps replay data.
+It lives under [`dashboard/`](dashboard/) and is documented separately in [`dashboard/README.md`](dashboard/README.md).
+
+Use the dashboard README for:
+
+- local frontend setup
+- environment variables
+- build and development commands
+- API base URL configuration
+- frontend troubleshooting
+
+The root README focuses on the full AISecOps Interceptor platform, while the dashboard README focuses only on the Replay Audit UI.
 
 ### Replay screenshots
 
