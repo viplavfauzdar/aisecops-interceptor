@@ -523,14 +523,29 @@ The frontend expects the backend API to be running at `http://localhost:8000`.
 
 Replay views are intended to show how AISecOps reconstructs runtime decisions from structured JSONL audit events.
 
-Planned screenshot placeholders:
+### Trace list view
 
-- `docs/replay-ui-list.png`
-  Shows the trace list view with filters, provenance trust summaries, and top-level decision status.
-- `docs/replay-ui-timeline.png`
-  Shows the ordered runtime timeline for a trace, including planning, evaluation, execution, and audit stages.
-- `docs/replay-ui-event-detail.png`
-  Shows the event detail drawer with provenance badges, event metadata, and decision context for forensic review.
+Shows the replay trace list with runtime decisions, provenance trust summaries, event counts, and forensic filtering.
+
+![Replay UI Trace List](docs/replay-ui-list.png)
+
+### Timeline view
+
+Shows the ordered runtime timeline for a trace, including planning, evaluation, execution, approval, and audit stages.
+
+![Replay UI Timeline](docs/replay-ui-timeline.png)
+
+### Event detail drawer
+
+Shows detailed runtime event metadata, provenance badges, execution plan correlation, and replay JSON inspection.
+
+![Replay UI Event Detail](docs/replay-ui-event-detail.png)
+
+### Execution graph view
+
+Shows provenance-aware runtime execution flow reconstruction across planning, evaluation, approval, execution, and final governance outcomes.
+
+![Replay UI Graph](docs/replay-ui-graph.png)
 
 The `/audit` endpoint supports optional query parameters: `event_type`, `stage`, `agent_name`, `tool_name`, `correlation_id`, and `limit`.
 `AuditLogger` can also emit the same `RuntimeEvent` records to multiple sinks, such as JSONL persistence and additional in-memory or external streaming adapters.
@@ -975,9 +990,18 @@ Available API functionality in the docs includes:
 - `GET /audit` for persisted runtime event inspection
 - `GET /audit/failures` for sink delivery failure inspection
 
-Swagger screenshot placeholder:
 
-![Swagger API docs placeholder](docs/swagger-api.png)
+Swagger API reference view:
+
+![Swagger API Docs](docs/swagger-api.png)
+
+Replay summary endpoint in Swagger:
+
+![Swagger Replay Summary Endpoint](docs/replay-summary.png)
+
+Replay timeline endpoint in Swagger:
+
+![Swagger Replay Timeline Endpoint](docs/replay-timeline.png)
 
 ## API: Execute vs Explain
 
