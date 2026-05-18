@@ -23,6 +23,7 @@
 - [Full local quick start](#full-local-quick-start)
 - [API: Execute vs Explain](#api-execute-vs-explain)
 - [Interactive API docs](#interactive-api-docs)
+- [Replay Audit UI](#replay-audit-ui)
 - [Replay screenshots](#replay-screenshots)
 - [Architecture direction](#architecture-direction)
 
@@ -474,7 +475,8 @@ Replay remains backward-compatible with older JSONL audit records that do not ca
 ### Replay API
 
 The replay API exposes the same trace reconstruction and summary logic used by the replay CLI.
-It exists to support remote investigation workflows now, Swagger shows these replay endpoints for local exploration, and it prepares the future replay UI without changing the underlying JSONL replay engine.
+It supports replay-backed forensic investigation, provenance-aware replay, runtime execution timeline reconstruction, and provenance trust summaries without changing the underlying JSONL replay engine.
+Those APIs now power CLI replay, Swagger replay exploration, and the frontend forensic replay UI.
 
 Endpoints:
 - `GET /replay`
@@ -493,30 +495,42 @@ curl http://127.0.0.1:8000/replay/<trace_id>/summary
 `GET /replay` lists trace summaries for the future replay UI, `GET /replay/{trace_id}` returns the timeline view, and `GET /replay/{trace_id}/summary` returns the concise audit view.
 Local CORS support is enabled for frontend development from `http://localhost:5173` and `http://127.0.0.1:5173`.
 
+## Replay Audit UI
+
+Located in `./dashboard/`.
+
+The Replay Audit UI is a React/Vite frontend that connects to the replay APIs for runtime forensic investigation.
+It supports provenance-aware replay analysis across these current screens:
+
+- trace list
+- replay timeline
+- event detail drawer
+- provenance badges
+- decision summaries
+
+### Setup
+
+```bash
+cd dashboard
+cp .env.example .env
+npm install
+npm run dev
+```
+
+The frontend expects the backend API to be running at `http://localhost:8000`.
+
 ### Replay screenshots
 
 Replay views are intended to show how AISecOps reconstructs runtime decisions from structured JSONL audit events.
 
-Planned screenshots:
+Planned screenshot placeholders:
 
-#### Replay summary
-
-![AISecOps Replay Summary](docs/replay-summary.png)
-
-Shows the concise investigation view for a trace, including final decision, event count, tool name, reason, provenance trust summary, and schema versions observed.
-
-#### Replay timeline
-
-![AISecOps Replay Timeline](docs/replay-timeline.png)
-
-Shows the ordered runtime timeline for a trace, including prompt/input events, execution plan creation, capability checks, policy decisions, approval flow, execution outcomes, event IDs, schema versions, and provenance metadata.
-
-To add these screenshots later:
-
-```text
-docs/replay-summary.png
-docs/replay-timeline.png
-```
+- `docs/replay-ui-list.png`
+  Shows the trace list view with filters, provenance trust summaries, and top-level decision status.
+- `docs/replay-ui-timeline.png`
+  Shows the ordered runtime timeline for a trace, including planning, evaluation, execution, and audit stages.
+- `docs/replay-ui-event-detail.png`
+  Shows the event detail drawer with provenance badges, event metadata, and decision context for forensic review.
 
 The `/audit` endpoint supports optional query parameters: `event_type`, `stage`, `agent_name`, `tool_name`, `correlation_id`, and `limit`.
 `AuditLogger` can also emit the same `RuntimeEvent` records to multiple sinks, such as JSONL persistence and additional in-memory or external streaming adapters.
@@ -836,6 +850,16 @@ tests/
   test_policy_loader.py
 ```
 
+Frontend:
+
+```text
+dashboard/
+  src/
+    components/
+    routes/
+    services/
+```
+
 ---
 
 
@@ -1078,6 +1102,7 @@ Latest verified local run:
 # Architecture direction
 
 AISecOps Interceptor is intended to become a **universal security runtime for AI agents**.
+It is also evolving toward runtime investigation, provenance-aware replay, execution graph analysis, and broader AI runtime governance.
 
 Goal architecture:
 
@@ -1130,7 +1155,7 @@ The objective is a portable runtime capable of securing:
 
 Current state:
 
-Working runtime core + guarded large language model pipeline + optional local guard + explicit plan/evaluate/execute split + capability gate + declarative policy engine + structured JSONL audit logging + end-to-end demo coverage.
+Working runtime core + guarded large language model pipeline + optional local guard + explicit plan/evaluate/execute split + capability gate + declarative policy engine + structured JSONL audit logging + provenance-aware replay + replay audit UI + runtime forensic timeline reconstruction + end-to-end demo coverage.
 
 Current engineering focus:
 
@@ -1175,27 +1200,3 @@ These frameworks orchestrate agents, while AISecOps Interceptor governs **runtim
 The long‑term goal is a portable runtime security layer that can protect any agent framework with minimal adapter code.
 
 ---
-
-## Replay Audit UI
-
-Located in `./dashboard/`.
-
-### Setup
-
-```bash
-cd dashboard
-cp .env.example .env
-npm install
-npm run dev
-```
-
-### Environment
-
-| Variable | Default | Description |
-|---|---|---|
-| `VITE_API_BASE_URL` | `http://localhost:8000` | Backend base URL |
-
-### Screens
-
-- `/` — Trace list with filters (decision, tool name, provenance trust)
-- `/trace/:traceId` — Event timeline with summary panel and event detail drawer
