@@ -43,6 +43,11 @@ export interface TraceListItem {
   provenance_trust_summary: Record<string, number>
   final_reason?: string
   schema_versions_observed?: string[]
+  plan_id?: string | null
+  intent?: string | null
+  risk_level?: string | null
+  requested_capabilities?: string[] | null
+  step_count?: number | null
 }
 
 export interface ProvenanceEntry {
@@ -58,6 +63,33 @@ export interface ProvenanceEntry {
   [key: string]: unknown
 }
 
+export interface PlanStep {
+  schema_version?: string
+  step_id?: string
+  intent?: string | null
+  tool_name?: string | null
+  capability?: string | null
+  target?: string | null
+  parameters?: Record<string, unknown>
+  risk_level?: string | null
+  order?: number | null
+}
+
+export interface PlanMetadata {
+  plan_id?: string | null
+  plan_intent?: string | null
+  intent?: string | null
+  plan_risk_level?: string | null
+  risk_level?: string | null
+  requested_tool?: string | null
+  requested_capabilities?: string[] | null
+  targets?: string[] | null
+  step_count?: number | null
+  plan_steps?: PlanStep[] | null
+  user_input?: string | null
+  model_output?: string | null
+}
+
 export interface TraceEvent {
   event_id: string | null
   schema_version: string | null
@@ -68,6 +100,13 @@ export interface TraceEvent {
   reason: string | null
   provenance: ProvenanceEntry[]
   execution_plan_id: string | null
+  plan_id?: string | null
+  plan_intent?: string | null
+  plan_risk_level?: string | null
+  requested_capabilities?: string[] | null
+  plan_steps?: PlanStep[] | null
+  user_input?: string | null
+  model_output?: string | null
   timestamp: string
   agent_name: string | null
 }
@@ -81,6 +120,11 @@ export interface TraceDetail {
   provenance_summary: Record<string, number>
   final_decision: string
   final_reason: string | null
+  plan_id?: string | null
+  intent?: string | null
+  risk_level?: string | null
+  requested_capabilities?: string[] | null
+  step_count?: number | null
 }
 
 export interface TraceSummary {
@@ -91,6 +135,11 @@ export interface TraceSummary {
   provenance_trust_summary: Record<string, number>
   event_count: number
   schema_versions_observed: string[]
+  plan_id?: string | null
+  intent?: string | null
+  risk_level?: string | null
+  requested_capabilities?: string[] | null
+  step_count?: number | null
 }
 
 export async function fetchTraces(filters?: TraceFilters): Promise<TraceListItem[]> {

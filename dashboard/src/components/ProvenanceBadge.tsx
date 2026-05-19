@@ -1,16 +1,8 @@
+import { sourceLabel } from '../lib/provenance'
+
 interface ProvenanceBadgeProps {
   entries: unknown
   maxVisible?: number
-}
-
-const SOURCE_LABELS: Record<string, string> = {
-  user_prompt: 'USER',
-  system_prompt: 'SYS',
-  skill: 'SKILL',
-  retrieval_chunk: 'RAG',
-  memory: 'MEM',
-  tool_result: 'TOOL',
-  agent_message: 'AGENT',
 }
 
 const TRUST_STYLES: Record<string, string> = {
@@ -36,10 +28,6 @@ function normalize(raw: unknown): NormalizedEntry[] {
     }))
   }
   return []
-}
-
-export function sourceLabel(source: string): string {
-  return SOURCE_LABELS[source] ?? source.slice(0, 6).toUpperCase()
 }
 
 const BADGE = 'font-mono text-xs px-1.5 py-0.5 border rounded-sm uppercase'
