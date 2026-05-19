@@ -8,6 +8,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field
 
 from aisecops_interceptor.core.context import RuntimeContext
+from aisecops_interceptor.planning.models import ExecutionPlan as StructuredExecutionPlan
 
 
 @dataclass(slots=True)
@@ -60,6 +61,7 @@ class ExecutionPlan:
     context: RuntimeContext
     tool_registry: dict[str, Callable[..., Any]]
     execution_plan_id: str = field(default_factory=lambda: uuid4().hex)
+    structured_plan: StructuredExecutionPlan | None = None
     approval_id: str | None = None
     dry_run: bool = False
     provenance: list[InstructionProvenance] = field(default_factory=list)
@@ -154,6 +156,13 @@ class ReplayTimelineEntryModel(BaseModel):
     reason: str | None = None
     provenance: list[dict[str, Any]] = Field(default_factory=list)
     execution_plan_id: str | None = None
+    plan_id: str | None = None
+    plan_intent: str | None = None
+    plan_risk_level: str | None = None
+    requested_capabilities: list[str] = Field(default_factory=list)
+    plan_steps: list[dict[str, Any]] = Field(default_factory=list)
+    model_output: str | None = None
+    user_input: str | None = None
 
 
 class ReplayTraceResponseModel(BaseModel):
@@ -165,6 +174,11 @@ class ReplayTraceResponseModel(BaseModel):
     provenance_summary: dict[str, int] = Field(default_factory=dict)
     final_decision: str | None = None
     final_reason: str | None = None
+    plan_id: str | None = None
+    intent: str | None = None
+    risk_level: str | None = None
+    requested_capabilities: list[str] | None = None
+    step_count: int | None = None
 
 
 class ReplaySummaryResponseModel(BaseModel):
@@ -175,6 +189,11 @@ class ReplaySummaryResponseModel(BaseModel):
     final_reason: str | None = None
     provenance_trust_summary: dict[str, int] = Field(default_factory=dict)
     schema_versions_observed: list[str] = Field(default_factory=list)
+    plan_id: str | None = None
+    intent: str | None = None
+    risk_level: str | None = None
+    requested_capabilities: list[str] | None = None
+    step_count: int | None = None
 
 
 @dataclass(slots=True)
