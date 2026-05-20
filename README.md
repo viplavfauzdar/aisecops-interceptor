@@ -355,7 +355,9 @@ Current implementation includes:
 
 ## v0.8.0 Preview: Structured Plan Extraction
 
-AISecOps now extracts a structured execution plan before policy evaluation, enabling intent-level governance, deterministic risk scoring, and future replay diffing. The plan captures the inferred intent, requested tool, requested capabilities, targets, parameters, provenance, and plan steps without calling an external LLM.
+AISecOps now extracts a structured execution plan before policy evaluation, enabling intent-level governance, deterministic risk scoring, and future replay diffing. The runtime derives `ExecutionPlan` and `PlanStep` metadata from explicit tool requests or model text without calling an external LLM.
+
+The plan captures inferred intent, requested tool, requested capabilities, targets, parameters, provenance, and ordered plan steps. Requested capabilities are normalized to canonical names such as `infra.restart`, plan risk is scored deterministically, and plan metadata is persisted into structured audit events and replay API responses. The replay dashboard can surface this metadata in its Plan view, while backend enforcement remains centralized in the interceptor, policy, approval, and execution-gate layers.
 
 Example extracted plan:
 
@@ -364,7 +366,7 @@ Example extracted plan:
   "intent": "restart_service",
   "requested_tool": "restart_service",
   "requested_capabilities": ["infra.restart"],
-  "targets": ["payments-api"],
+  "targets": ["orders"],
   "risk_level": "critical"
 }
 ```
