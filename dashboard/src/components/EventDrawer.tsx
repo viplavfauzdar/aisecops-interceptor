@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { X } from 'lucide-react'
 import type { TraceEvent } from '../api/replayClient'
 import { copyToClipboard } from '../lib/clipboard'
+import { PlanPanel } from './PlanPanel'
 import { ProvenanceBadge } from './ProvenanceBadge'
 
 interface EventDrawerProps {
@@ -74,7 +75,19 @@ export function EventDrawer({ event, onClose }: EventDrawerProps) {
         )}
 
         {/* JSON body */}
-        <div className="flex-1 overflow-auto p-4">
+        <div className="flex-1 overflow-auto p-4 space-y-4">
+          <PlanPanel
+            plan={{
+              plan_id: event.plan_id,
+              plan_intent: event.plan_intent,
+              plan_risk_level: event.plan_risk_level,
+              requested_capabilities: event.requested_capabilities,
+              step_count: event.plan_steps?.length,
+              plan_steps: event.plan_steps,
+              user_input: event.user_input,
+              model_output: event.model_output,
+            }}
+          />
           <pre className="bg-slate-950 text-green-400 font-mono text-xs leading-relaxed p-4 rounded overflow-auto whitespace-pre-wrap break-words border border-slate-800">
             {JSON.stringify(event, null, 2)}
           </pre>

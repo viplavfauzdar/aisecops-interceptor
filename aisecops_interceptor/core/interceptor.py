@@ -12,6 +12,7 @@ from aisecops_interceptor.core.events import RuntimeEvent
 from aisecops_interceptor.core.exceptions import ApprovalRequiredError, PolicyViolationError, ToolNotFoundError
 from aisecops_interceptor.core.models import DecisionTrace, DryRunResult, ExecutionPlan, InterceptionRequest, ToolCall
 from aisecops_interceptor.core.policy import PolicyEngine
+from aisecops_interceptor.planning.extractor import PlanExtractor
 
 
 class AgentInterceptor:
@@ -28,6 +29,7 @@ class AgentInterceptor:
         self.approval_store = approval_store or ApprovalStore()
         self.capability_registry = capability_registry or CapabilityRegistry()
         self.executor = PlanExecutor()
+        self.plan_extractor = PlanExtractor()
 
     def intercept(self, request: InterceptionRequest) -> Any:
         plan = self.plan(request)
@@ -50,6 +52,7 @@ class AgentInterceptor:
                 matched_rule=trace.policy_decision.matched_rule if trace.policy_decision is not None else None,
                 approval_id=plan.approval_id,
                 execution_plan_id=plan.execution_plan_id,
+                **self._plan_event_fields(plan),
                 decision_stage="execute",
                 capability_risks=capability_risks,
                 provenance=plan.provenance or None,
@@ -72,6 +75,7 @@ class AgentInterceptor:
                     matched_rule="capability_gate",
                     approval_id=plan.approval_id,
                     execution_plan_id=plan.execution_plan_id,
+                    **self._plan_event_fields(plan),
                     decision_stage="decision",
                     capability_risks=capability_risks,
                     audit_kind="capability",
@@ -110,6 +114,7 @@ class AgentInterceptor:
                     matched_rule=decision.matched_rule,
                     approval_id=approval_request.approval_id,
                     execution_plan_id=plan.execution_plan_id,
+                    **self._plan_event_fields(plan),
                     decision_stage="decision",
                     capability_risks=capability_risks,
                     audit_kind="decision",
@@ -138,6 +143,7 @@ class AgentInterceptor:
                 matched_rule=decision.matched_rule,
                 approval_id=plan.approval_id,
                 execution_plan_id=plan.execution_plan_id,
+                **self._plan_event_fields(plan),
                 decision_stage="decision",
                 capability_risks=capability_risks,
                 audit_kind="decision",
@@ -176,6 +182,7 @@ class AgentInterceptor:
                 matched_rule=decision.matched_rule,
                 approval_id=plan.approval_id,
                 execution_plan_id=plan.execution_plan_id,
+                **self._plan_event_fields(plan),
                 decision_stage="execute",
                 capability_risks=capability_risks,
                 audit_kind="tool_execution",
@@ -193,6 +200,7 @@ class AgentInterceptor:
                 matched_rule=decision.matched_rule,
                 approval_id=plan.approval_id,
                 execution_plan_id=plan.execution_plan_id,
+                **self._plan_event_fields(plan),
                 decision_stage="execute",
                 capability_risks=capability_risks,
                 provenance=plan.provenance or None,
@@ -213,6 +221,10 @@ class AgentInterceptor:
             dry_run=request.dry_run,
             provenance=list(request.context.provenance),
         )
+        plan.structured_plan = self.plan_extractor.extract(
+            request.context,
+            plan_id=plan.execution_plan_id,
+        )
         self.audit_logger.log(
             RuntimeEvent.audit_event(
                 event_type="plan",
@@ -222,12 +234,15 @@ class AgentInterceptor:
                 context=request.context,
                 approval_id=request.approval_id,
                 execution_plan_id=plan.execution_plan_id,
+                **self._plan_event_fields(plan),
                 decision_stage="plan",
+                risk_level=plan.structured_plan.risk_level,
                 capability_risks=self._capability_risks_for_tool(request.context.tool_name),
                 provenance=plan.provenance or None,
                 payload={
                     "dry_run": request.dry_run,
                     "tool_name": request.context.tool_name,
+                    "plan": plan.structured_plan.model_dump(),
                 },
             )
         )
@@ -267,6 +282,7 @@ class AgentInterceptor:
                     matched_rule="capability_gate",
                     approval_id=plan.approval_id,
                     execution_plan_id=plan.execution_plan_id,
+                    **self._plan_event_fields(plan),
                     decision_stage="evaluate",
                     capability_risks=capability_metadata and {
                         name: definition.risk for name, definition in capability_metadata.items()
@@ -327,6 +343,7 @@ class AgentInterceptor:
                 matched_rule=decision.matched_rule,
                 approval_id=plan.approval_id,
                 execution_plan_id=plan.execution_plan_id,
+                **self._plan_event_fields(plan),
                 decision_stage="evaluate",
                 capability_risks=capability_metadata and {
                     name: definition.risk for name, definition in capability_metadata.items()
@@ -389,6 +406,21 @@ class AgentInterceptor:
         if not metadata:
             return None
         return {name: definition.risk for name, definition in metadata.items()}
+
+    @staticmethod
+    def _plan_event_fields(plan: ExecutionPlan) -> dict[str, Any]:
+        structured_plan = plan.structured_plan
+        if structured_plan is None:
+            return {}
+        return {
+            "plan_id": structured_plan.plan_id,
+            "plan_intent": structured_plan.intent,
+            "plan_risk_level": structured_plan.risk_level,
+            "requested_capabilities": list(structured_plan.requested_capabilities),
+            "plan_steps": [step.model_dump() for step in structured_plan.steps],
+            "model_output": structured_plan.model_output,
+            "user_input": structured_plan.user_input,
+        }
 
     def execute(
         self,

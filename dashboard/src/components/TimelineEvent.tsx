@@ -2,7 +2,8 @@ import type { TraceEvent } from '../api/replayClient'
 import { copyToClipboard } from '../lib/clipboard'
 import { DecisionBadge } from './DecisionBadge'
 import { DecisionStageBadge } from './DecisionStageBadge'
-import { ProvenanceBadge, sourceLabel } from './ProvenanceBadge'
+import { sourceLabel } from '../lib/provenance'
+import { ProvenanceBadge } from './ProvenanceBadge'
 import { MetadataTooltip } from './MetadataTooltip'
 
 interface TimelineEventProps {

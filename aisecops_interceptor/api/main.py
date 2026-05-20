@@ -463,6 +463,8 @@ class ExecuteRequest(BaseModel):
     agent_name: str = Field(..., examples=["sales_agent"])
     tool_name: str = Field(..., examples=["read_customer"])
     arguments: dict = Field(default_factory=dict)
+    user_input: str | None = None
+    model_output: str | None = None
     approval_id: str | None = None
     dry_run: bool = False
     provenance: list[InstructionProvenance] = Field(default_factory=list)
@@ -581,6 +583,13 @@ def _replay_timeline_entry_payload(entry) -> ReplayTimelineEntryModel:
         reason=entry.reason,
         provenance=[item.to_dict() for item in entry.provenance],
         execution_plan_id=entry.execution_plan_id,
+        plan_id=entry.plan_id,
+        plan_intent=entry.plan_intent,
+        plan_risk_level=entry.plan_risk_level,
+        requested_capabilities=entry.requested_capabilities,
+        plan_steps=entry.plan_steps,
+        model_output=entry.model_output,
+        user_input=entry.user_input,
     )
 
 
@@ -704,6 +713,17 @@ def replay_trace_list(
                 "schema_versions_observed": summary.schema_versions_observed,
                 "first_seen": summary.first_seen,
                 "last_seen": summary.last_seen,
+                **(
+                    {
+                        "plan_id": summary.plan_id,
+                        "intent": summary.intent,
+                        "risk_level": summary.risk_level,
+                        "requested_capabilities": summary.requested_capabilities,
+                        "step_count": summary.step_count,
+                    }
+                    if summary.plan_id is not None
+                    else {}
+                ),
             }
             for summary in summaries
         ],
@@ -712,7 +732,12 @@ def replay_trace_list(
     }
 
 
-@app.get("/replay/{trace_id}", responses=REPLAY_RESPONSES, response_model=ReplayTraceResponseModel)
+@app.get(
+    "/replay/{trace_id}",
+    responses=REPLAY_RESPONSES,
+    response_model=ReplayTraceResponseModel,
+    response_model_exclude_none=True,
+)
 def replay_trace(trace_id: str):
     try:
         timeline = _load_replay_timeline(trace_id)
@@ -729,10 +754,20 @@ def replay_trace(trace_id: str):
         provenance_summary=result.provenance_summary,
         final_decision=result.final_decision,
         final_reason=result.final_reason,
-    ).model_dump()
+        plan_id=result.plan_id,
+        intent=result.intent,
+        risk_level=result.risk_level,
+        requested_capabilities=result.requested_capabilities,
+        step_count=result.step_count,
+    ).model_dump(exclude_none=True)
 
 
-@app.get("/replay/{trace_id}/summary", responses=REPLAY_SUMMARY_RESPONSES, response_model=ReplaySummaryResponseModel)
+@app.get(
+    "/replay/{trace_id}/summary",
+    responses=REPLAY_SUMMARY_RESPONSES,
+    response_model=ReplaySummaryResponseModel,
+    response_model_exclude_none=True,
+)
 def replay_trace_summary(trace_id: str):
     try:
         timeline = _load_replay_timeline(trace_id)
@@ -748,7 +783,12 @@ def replay_trace_summary(trace_id: str):
         final_reason=summary.final_reason,
         provenance_trust_summary=summary.provenance_trust_summary,
         schema_versions_observed=summary.schema_versions_observed,
-    ).model_dump()
+        plan_id=summary.plan_id,
+        intent=summary.intent,
+        risk_level=summary.risk_level,
+        requested_capabilities=summary.requested_capabilities,
+        step_count=summary.step_count,
+    ).model_dump(exclude_none=True)
 
 
 
@@ -794,6 +834,8 @@ def execute_openclaw(request: OpenClawExecuteRequest) -> dict:
 def interceptor_context_from_request(request: ExecuteRequest) -> RuntimeContext:
     return RuntimeContext(
         agent_name=request.agent_name,
+        prompt=request.user_input,
+        model_output=request.model_output,
         tool_name=request.tool_name,
         arguments=request.arguments,
         framework="legacy",

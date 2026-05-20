@@ -32,6 +32,13 @@ class RuntimeEvent:
     trace_id: str | None = None
     parent_trace_id: str | None = None
     execution_plan_id: str | None = None
+    plan_id: str | None = None
+    plan_intent: str | None = None
+    plan_risk_level: str | None = None
+    requested_capabilities: list[str] | None = None
+    plan_steps: list[dict[str, Any]] | None = None
+    model_output: str | None = None
+    user_input: str | None = None
     decision_stage: str | None = None
     audit_kind: str | None = None
     reason: str | None = None
@@ -93,6 +100,23 @@ class RuntimeEvent:
                 execution_plan_id=(
                     str(data["execution_plan_id"]) if data.get("execution_plan_id") is not None else None
                 ),
+                plan_id=str(data["plan_id"]) if data.get("plan_id") is not None else None,
+                plan_intent=str(data["plan_intent"]) if data.get("plan_intent") is not None else None,
+                plan_risk_level=(
+                    str(data["plan_risk_level"]) if data.get("plan_risk_level") is not None else None
+                ),
+                requested_capabilities=(
+                    [str(item) for item in data["requested_capabilities"]]
+                    if isinstance(data.get("requested_capabilities"), list)
+                    else None
+                ),
+                plan_steps=(
+                    [dict(item) for item in data["plan_steps"] if isinstance(item, dict)]
+                    if isinstance(data.get("plan_steps"), list)
+                    else None
+                ),
+                model_output=str(data["model_output"]) if data.get("model_output") is not None else None,
+                user_input=str(data["user_input"]) if data.get("user_input") is not None else None,
                 decision_stage=(
                     str(data["decision_stage"]) if data.get("decision_stage") is not None else None
                 ),
@@ -144,6 +168,23 @@ class RuntimeEvent:
             execution_plan_id=(
                 str(data["execution_plan_id"]) if data.get("execution_plan_id") is not None else None
             ),
+            plan_id=str(data["plan_id"]) if data.get("plan_id") is not None else None,
+            plan_intent=str(data["plan_intent"]) if data.get("plan_intent") is not None else None,
+            plan_risk_level=(
+                str(data["plan_risk_level"]) if data.get("plan_risk_level") is not None else None
+            ),
+            requested_capabilities=(
+                [str(item) for item in data["requested_capabilities"]]
+                if isinstance(data.get("requested_capabilities"), list)
+                else None
+            ),
+            plan_steps=(
+                [dict(item) for item in data["plan_steps"] if isinstance(item, dict)]
+                if isinstance(data.get("plan_steps"), list)
+                else None
+            ),
+            model_output=str(data["model_output"]) if data.get("model_output") is not None else None,
+            user_input=str(data["user_input"]) if data.get("user_input") is not None else None,
             decision_stage=(
                 str(data["decision_stage"]) if data.get("decision_stage") is not None else None
             ),
@@ -197,6 +238,13 @@ class RuntimeEvent:
         trace_id: str | None = None,
         parent_trace_id: str | None = None,
         execution_plan_id: str | None = None,
+        plan_id: str | None = None,
+        plan_intent: str | None = None,
+        plan_risk_level: str | None = None,
+        requested_capabilities: list[str] | None = None,
+        plan_steps: list[dict[str, Any]] | None = None,
+        model_output: str | None = None,
+        user_input: str | None = None,
         decision_stage: str | None = None,
         correlation_id: str | None = None,
         allowed: bool | None = None,
@@ -222,6 +270,13 @@ class RuntimeEvent:
             trace_id=trace_id,
             parent_trace_id=parent_trace_id,
             execution_plan_id=execution_plan_id,
+            plan_id=plan_id,
+            plan_intent=plan_intent,
+            plan_risk_level=plan_risk_level,
+            requested_capabilities=requested_capabilities,
+            plan_steps=plan_steps,
+            model_output=model_output,
+            user_input=user_input,
             decision_stage=decision_stage,
             audit_kind=audit_kind,
             reason=reason,
@@ -258,6 +313,13 @@ class RuntimeEvent:
         matched_rule: str | None = None,
         approval_id: str | None = None,
         execution_plan_id: str | None = None,
+        plan_id: str | None = None,
+        plan_intent: str | None = None,
+        plan_risk_level: str | None = None,
+        requested_capabilities: list[str] | None = None,
+        plan_steps: list[dict[str, Any]] | None = None,
+        model_output: str | None = None,
+        user_input: str | None = None,
         decision_stage: str | None = None,
         audit_kind: str | None = None,
         capability_risks: dict[str, str | None] | None = None,
@@ -278,6 +340,13 @@ class RuntimeEvent:
             trace_id=context.trace_id,
             parent_trace_id=context.parent_trace_id,
             execution_plan_id=execution_plan_id,
+            plan_id=plan_id,
+            plan_intent=plan_intent,
+            plan_risk_level=plan_risk_level,
+            requested_capabilities=requested_capabilities,
+            plan_steps=plan_steps,
+            model_output=model_output,
+            user_input=user_input,
             decision_stage=decision_stage,
             correlation_id=context.correlation_id,
             allowed=allowed,
@@ -305,6 +374,13 @@ class RuntimeEvent:
         trace_id: str | None = None,
         parent_trace_id: str | None = None,
         execution_plan_id: str | None = None,
+        plan_id: str | None = None,
+        plan_intent: str | None = None,
+        plan_risk_level: str | None = None,
+        requested_capabilities: list[str] | None = None,
+        plan_steps: list[dict[str, Any]] | None = None,
+        model_output: str | None = None,
+        user_input: str | None = None,
         decision_stage: str | None = None,
         audit_kind: str | None = None,
         provenance: list[InstructionProvenance] | None = None,
@@ -324,6 +400,13 @@ class RuntimeEvent:
             trace_id=context.trace_id if context else trace_id,
             parent_trace_id=context.parent_trace_id if context else parent_trace_id,
             execution_plan_id=execution_plan_id,
+            plan_id=plan_id,
+            plan_intent=plan_intent,
+            plan_risk_level=plan_risk_level,
+            requested_capabilities=requested_capabilities,
+            plan_steps=plan_steps,
+            model_output=model_output,
+            user_input=user_input,
             decision_stage=decision_stage,
             correlation_id=context.correlation_id if context else None,
             allowed=((decision == "allowed") if decision in {"allowed", "blocked"} else None),
@@ -347,6 +430,13 @@ class RuntimeEvent:
         trace_id: str | None = None,
         parent_trace_id: str | None = None,
         execution_plan_id: str | None = None,
+        plan_id: str | None = None,
+        plan_intent: str | None = None,
+        plan_risk_level: str | None = None,
+        requested_capabilities: list[str] | None = None,
+        plan_steps: list[dict[str, Any]] | None = None,
+        model_output: str | None = None,
+        user_input: str | None = None,
         decision_stage: str | None = None,
         risk_level: str = "low",
         matched_rule: str | None = None,
@@ -371,6 +461,13 @@ class RuntimeEvent:
             trace_id=context.trace_id if context else trace_id,
             parent_trace_id=context.parent_trace_id if context else parent_trace_id,
             execution_plan_id=execution_plan_id,
+            plan_id=plan_id,
+            plan_intent=plan_intent,
+            plan_risk_level=plan_risk_level,
+            requested_capabilities=requested_capabilities,
+            plan_steps=plan_steps,
+            model_output=model_output,
+            user_input=user_input,
             decision_stage=decision_stage,
             correlation_id=context.correlation_id if context else None,
             allowed=None,

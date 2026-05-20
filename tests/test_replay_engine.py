@@ -20,6 +20,11 @@ def _write_event(
     decision_stage: str | None = None,
     reason: str | None = None,
     provenance: list[InstructionProvenance] | None = None,
+    plan_id: str | None = None,
+    plan_intent: str | None = None,
+    plan_risk_level: str | None = None,
+    requested_capabilities: list[str] | None = None,
+    plan_steps: list[dict] | None = None,
 ) -> None:
     logger.log(
         RuntimeEvent.audit_event(
@@ -34,6 +39,11 @@ def _write_event(
                 provenance=provenance or [],
             ),
             execution_plan_id=execution_plan_id,
+            plan_id=plan_id,
+            plan_intent=plan_intent,
+            plan_risk_level=plan_risk_level,
+            requested_capabilities=requested_capabilities,
+            plan_steps=plan_steps,
             decision_stage=decision_stage,
             provenance=provenance,
         )
@@ -272,6 +282,37 @@ def test_replay_trace_result_includes_execution_plans_and_final_fields(tmp_path)
     assert result.final_decision == "blocked"
     assert result.final_reason == "Rule blocked tool 'send_email'"
     assert result.provenance_summary == {"unverified": 1}
+
+
+def test_replay_summary_includes_plan_metadata(tmp_path) -> None:
+    audit_file = tmp_path / "audit.jsonl"
+    logger = AuditLogger(log_path=str(audit_file))
+    _write_event(
+        logger,
+        trace_id="run-123",
+        event_type="plan",
+        decision="pending",
+        tool_name="restart_service",
+        execution_plan_id="plan-1",
+        plan_id="plan-1",
+        plan_intent="restart_service",
+        plan_risk_level="critical",
+        requested_capabilities=["infra.restart"],
+        plan_steps=[{"step_id": "step-1", "tool_name": "restart_service"}],
+        decision_stage="plan",
+        reason="Execution plan created",
+    )
+
+    timeline = AuditReplayEngine().replay_trace(audit_file, "run-123")
+    summary = AuditReplayEngine.summarize_timeline(timeline)
+    result = AuditReplayEngine.build_trace_result(timeline)
+
+    assert summary.plan_id == "plan-1"
+    assert summary.intent == "restart_service"
+    assert summary.risk_level == "critical"
+    assert summary.requested_capabilities == ["infra.restart"]
+    assert summary.step_count == 1
+    assert result.plan_id == "plan-1"
 
 
 def test_list_traces_filters_and_applies_limit(tmp_path) -> None:

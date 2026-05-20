@@ -14,6 +14,7 @@ class RuntimeContext:
     user_id: str | None = None
     session_id: str | None = None
     prompt: str | None = None
+    model_output: str | None = None
     data_classification: str | None = None
     source: str | None = None
     sensitivity_level: str | None = None

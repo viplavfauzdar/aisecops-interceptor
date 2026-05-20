@@ -2,16 +2,32 @@ import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, RefreshCw, Copy } from 'lucide-react'
-import { fetchTrace, fetchTraceSummary, type TraceEvent } from '../api/replayClient'
+import { fetchTrace, fetchTraceSummary, type PlanMetadata, type TraceEvent } from '../api/replayClient'
 import { EventDrawer } from '../components/EventDrawer'
 import { ExecutionGraph } from '../components/ExecutionGraph'
+import { PlanPanel } from '../components/PlanPanel'
 import { SummaryCards } from '../components/SummaryCards'
 import { TimelineEvent } from '../components/TimelineEvent'
 import { copyToClipboard } from '../lib/clipboard'
 
-type Tab = 'timeline' | 'graph'
+type Tab = 'timeline' | 'graph' | 'plan'
 
-const TABS: Tab[] = ['timeline', 'graph']
+const TABS: Tab[] = ['timeline', 'graph', 'plan']
+
+function planFromTrace(trace: { timeline: TraceEvent[] }, summary?: PlanMetadata): PlanMetadata {
+  const planEvent = trace.timeline.find(event => event.plan_id || event.plan_steps?.length)
+  return {
+    ...summary,
+    plan_id: summary?.plan_id ?? planEvent?.plan_id,
+    intent: summary?.intent ?? planEvent?.plan_intent,
+    risk_level: summary?.risk_level ?? planEvent?.plan_risk_level,
+    requested_capabilities: summary?.requested_capabilities ?? planEvent?.requested_capabilities,
+    step_count: summary?.step_count ?? planEvent?.plan_steps?.length,
+    plan_steps: planEvent?.plan_steps,
+    user_input: planEvent?.user_input,
+    model_output: planEvent?.model_output,
+  }
+}
 
 export function TraceDetail() {
   const { traceId } = useParams<{ traceId: string }>()
@@ -131,6 +147,10 @@ export function TraceDetail() {
                   if (ev) setSelectedEvent(ev)
                 }}
               />
+            )}
+
+            {activeTab === 'plan' && (
+              <PlanPanel plan={planFromTrace(traceQuery.data, summaryQuery.data)} />
             )}
           </>
         )}

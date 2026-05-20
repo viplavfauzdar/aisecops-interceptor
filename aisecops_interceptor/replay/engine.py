@@ -39,6 +39,13 @@ class ReplayTimelineEntry:
     reason: str | None
     provenance: list[InstructionProvenance]
     execution_plan_id: str | None
+    plan_id: str | None = None
+    plan_intent: str | None = None
+    plan_risk_level: str | None = None
+    requested_capabilities: list[str] = field(default_factory=list)
+    plan_steps: list[dict] = field(default_factory=list)
+    model_output: str | None = None
+    user_input: str | None = None
 
     @classmethod
     def from_event(cls, event: RuntimeEvent) -> "ReplayTimelineEntry":
@@ -54,6 +61,13 @@ class ReplayTimelineEntry:
             reason=event.reason,
             provenance=list(event.provenance or ()),
             execution_plan_id=event.execution_plan_id,
+            plan_id=event.plan_id,
+            plan_intent=event.plan_intent,
+            plan_risk_level=event.plan_risk_level,
+            requested_capabilities=list(event.requested_capabilities or ()),
+            plan_steps=list(event.plan_steps or ()),
+            model_output=event.model_output,
+            user_input=event.user_input,
         )
 
 
@@ -74,6 +88,11 @@ class ReplaySummary:
     final_reason: str | None
     provenance_trust_summary: dict[str, int]
     schema_versions_observed: list[str]
+    plan_id: str | None = None
+    intent: str | None = None
+    risk_level: str | None = None
+    requested_capabilities: list[str] | None = None
+    step_count: int | None = None
     first_seen: str | None = None
     last_seen: str | None = None
 
@@ -88,6 +107,11 @@ class ReplayTraceResult:
     provenance_summary: dict[str, int]
     final_decision: str | None
     final_reason: str | None
+    plan_id: str | None = None
+    intent: str | None = None
+    risk_level: str | None = None
+    requested_capabilities: list[str] | None = None
+    step_count: int | None = None
 
 
 class AuditReplayEngine:
@@ -147,6 +171,7 @@ class AuditReplayEngine:
         trust_summary: dict[str, int] = {}
         schema_versions: list[str] = []
         seen_versions: set[str] = set()
+        plan_entry = next((entry for entry in timeline.entries if entry.plan_id is not None), None)
 
         for entry in timeline.entries:
             version = entry.schema_version or "legacy"
@@ -164,6 +189,13 @@ class AuditReplayEngine:
             final_reason=final_entry.reason if final_entry is not None else None,
             provenance_trust_summary=trust_summary,
             schema_versions_observed=schema_versions,
+            plan_id=plan_entry.plan_id if plan_entry is not None else None,
+            intent=plan_entry.plan_intent if plan_entry is not None else None,
+            risk_level=plan_entry.plan_risk_level if plan_entry is not None else None,
+            requested_capabilities=(
+                list(plan_entry.requested_capabilities) if plan_entry is not None else None
+            ),
+            step_count=len(plan_entry.plan_steps) if plan_entry is not None else None,
             first_seen=timeline.entries[0].timestamp if timeline.entries else None,
             last_seen=timeline.entries[-1].timestamp if timeline.entries else None,
         )
@@ -189,6 +221,11 @@ class AuditReplayEngine:
             provenance_summary=summary.provenance_trust_summary,
             final_decision=summary.final_decision,
             final_reason=summary.final_reason,
+            plan_id=summary.plan_id,
+            intent=summary.intent,
+            risk_level=summary.risk_level,
+            requested_capabilities=summary.requested_capabilities,
+            step_count=summary.step_count,
         )
 
     def list_traces(

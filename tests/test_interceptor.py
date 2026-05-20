@@ -122,6 +122,11 @@ def test_intercept_supports_runtime_context_contract() -> None:
     assert all(isinstance(event, RuntimeEvent) for event in events)
     assert [event.event_type for event in events] == ["plan", "decision", "tool_call", "tool_allowed", "tool_executed", "final_output"]
     assert len({event.trace_id for event in events}) == 1
+    assert all(event.plan_id for event in events)
+    assert events[0].plan_intent == "read_customer"
+    assert events[0].plan_risk_level == "low"
+    assert events[0].requested_capabilities == ["customer.read"]
+    assert events[0].plan_steps[0]["tool_name"] == "read_customer"
 
 
 def test_intercept_propagates_provenance_to_runtime_events() -> None:
@@ -315,3 +320,20 @@ def test_dry_run_returns_approval_requirement_and_emits_event() -> None:
     assert result.would_block is False
     assert result.would_require_approval is True
     assert [event.event_type for event in interceptor.audit_logger.events()] == ["plan", "decision", "tool_call", "approval_required"]
+
+
+def test_old_request_shape_generates_internal_structured_plan() -> None:
+    interceptor = make_interceptor()
+
+    result = interceptor.execute(
+        agent_name="sales_agent",
+        tool_call=ToolCall(name="read_customer", arguments={"customer_id": "123"}),
+        tool_registry={"read_customer": lambda customer_id: {"customer_id": customer_id}},
+    )
+
+    assert result == {"customer_id": "123"}
+    plan_event = list(interceptor.audit_logger.events())[0]
+    assert plan_event.event_type == "plan"
+    assert plan_event.plan_id == plan_event.execution_plan_id
+    assert plan_event.plan_intent == "read_customer"
+    assert plan_event.plan_steps[0]["parameters"] == {"customer_id": "123"}

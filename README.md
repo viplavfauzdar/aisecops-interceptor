@@ -317,6 +317,7 @@ Current implementation includes:
 
 - Interceptor core with explicit execution split: `plan` → `evaluate` → `execute`
 - Runtime context propagation
+- Structured plan extraction before policy evaluation
 - Capability-gated tool execution
 - Policy evaluation and human approval workflow
 - Dry-run mode for non-executing decision checks
@@ -349,6 +350,26 @@ Current implementation includes:
 - FastAPI runtime wrapper
 - Demo scripts (`agent_demo`, `capabilities_demo`, `demo.py`, `hack_the_agent_demo`, `langgraph_style_demo`, `openclaw_demo`, `policy_bundle_demo`)
 - Full pytest test suite
+
+---
+
+## v0.8.0 Preview: Structured Plan Extraction
+
+AISecOps now extracts a structured execution plan before policy evaluation, enabling intent-level governance, deterministic risk scoring, and future replay diffing. The runtime derives `ExecutionPlan` and `PlanStep` metadata from explicit tool requests or model text without calling an external LLM.
+
+The plan captures inferred intent, requested tool, requested capabilities, targets, parameters, provenance, and ordered plan steps. Requested capabilities are normalized to canonical names such as `infra.restart`, plan risk is scored deterministically, and plan metadata is persisted into structured audit events and replay API responses. The replay dashboard can surface this metadata in its Plan view, while backend enforcement remains centralized in the interceptor, policy, approval, and execution-gate layers.
+
+Example extracted plan:
+
+```json
+{
+  "intent": "restart_service",
+  "requested_tool": "restart_service",
+  "requested_capabilities": ["infra.restart"],
+  "targets": ["orders"],
+  "risk_level": "critical"
+}
+```
 
 ---
 
