@@ -5,6 +5,7 @@ import re
 from typing import Any
 
 from aisecops_interceptor.core.context import RuntimeContext
+from aisecops_interceptor.planning.capabilities import requested_capabilities_for_tool
 from aisecops_interceptor.planning.models import ExecutionPlan, PlanStep
 from aisecops_interceptor.planning.risk import risk_for_tool, score_plan
 
@@ -65,7 +66,10 @@ class PlanExtractor:
         target = self._string_value(payload, "target") or self._match(_TARGET_RE, text)
         if target and target not in targets:
             targets.append(target)
-        requested_capabilities = self._list_value(payload, "requested_capabilities", "capabilities")
+        requested_capabilities = requested_capabilities_for_tool(
+            tool_name,
+            self._list_value(payload, "requested_capabilities", "capabilities"),
+        )
         risk_level = risk_for_tool(tool_name)
         step = PlanStep(
             intent=intent,
@@ -102,11 +106,7 @@ class PlanExtractor:
 
     @staticmethod
     def _requested_capabilities(context: RuntimeContext, tool_name: str | None) -> list[str]:
-        if context.allowed_capabilities:
-            return list(context.allowed_capabilities)
-        if not tool_name:
-            return []
-        return [tool_name.replace("_", ".")]
+        return requested_capabilities_for_tool(tool_name, context.allowed_capabilities)
 
     @staticmethod
     def _targets_from_arguments(arguments: dict[str, Any]) -> list[str]:

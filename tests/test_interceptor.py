@@ -125,7 +125,7 @@ def test_intercept_supports_runtime_context_contract() -> None:
     assert all(event.plan_id for event in events)
     assert events[0].plan_intent == "read_customer"
     assert events[0].plan_risk_level == "low"
-    assert events[0].requested_capabilities == ["read.customer"]
+    assert events[0].requested_capabilities == ["customer.read"]
     assert events[0].plan_steps[0]["tool_name"] == "read_customer"
 
 
