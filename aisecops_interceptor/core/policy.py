@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from aisecops_interceptor.core.context import RuntimeContext
-from aisecops_interceptor.core.models import PolicyDecision, ToolCall
+from aisecops_interceptor.core.cost import CostEstimator
+from aisecops_interceptor.core.models import PolicyDecision, RuntimeBudget, RuntimeUsage, ToolCall
 from aisecops_interceptor.policy.loader import PolicyLoader
 from aisecops_interceptor.policy.rule_engine import RuleEngine
 from aisecops_interceptor.policy.rules import Rule
@@ -31,6 +32,7 @@ class PolicyEngine:
             self.high_risk_tools = tuple(
                 dict.fromkeys(DEFAULT_HIGH_RISK_TOOLS + configured_high_risk_tools)
             )
+        self.cost_estimator = CostEstimator()
 
     @classmethod
     def from_yaml(cls, path: str | None = None) -> "PolicyEngine":
@@ -48,6 +50,14 @@ class PolicyEngine:
         tool_call: ToolCall,
         context: RuntimeContext | None = None,
     ) -> PolicyDecision:
+        budget_decision = self._evaluate_runtime_budget(
+            agent_name=agent_name,
+            tool_call=tool_call,
+            context=context,
+        )
+        if budget_decision is not None:
+            return budget_decision
+
         rule_decision = self.rule_engine.evaluate(
             agent_name=agent_name,
             tool_call=tool_call,
@@ -127,6 +137,95 @@ class PolicyEngine:
             )
 
         return PolicyDecision(allowed=True, reason="Allowed by policy", risk_level="low")
+
+    def runtime_budget_for_agent(self, agent_name: str | None) -> RuntimeBudget:
+        global_limits = self.config.get("agent_limits", {})
+        agent_limits = self.config.get("agents", {}).get(agent_name or "", {})
+        merged = {
+            "max_tool_calls": 20,
+            "max_depth": 5,
+            "max_runtime_seconds": 60,
+            "max_cost_usd": 2.00,
+        }
+        if isinstance(global_limits, dict):
+            merged.update(self._budget_fields(global_limits))
+        if isinstance(agent_limits, dict):
+            merged.update(self._budget_fields(agent_limits))
+        return RuntimeBudget(
+            max_tool_calls=int(merged["max_tool_calls"]),
+            max_depth=int(merged["max_depth"]),
+            max_runtime_seconds=float(merged["max_runtime_seconds"]),
+            max_cost_usd=float(merged["max_cost_usd"]),
+        )
+
+    def runtime_usage_for_context(
+        self,
+        *,
+        context: RuntimeContext | None,
+        tool_call: ToolCall,
+    ) -> RuntimeUsage:
+        usage = context.runtime_usage if context is not None and context.runtime_usage is not None else RuntimeUsage()
+        estimated_cost = usage.estimated_cost_usd
+        if estimated_cost <= 0:
+            estimated_cost = self.cost_estimator.estimate_tool_cost_usd(tool_call.name)
+        return RuntimeUsage(
+            tool_calls_used=max(0, int(usage.tool_calls_used)),
+            depth_used=max(0, int(usage.depth_used)),
+            runtime_seconds=max(0, float(usage.runtime_seconds)),
+            estimated_cost_usd=max(0, float(estimated_cost)),
+        )
+
+    def runtime_budget_status(
+        self,
+        *,
+        agent_name: str | None,
+        tool_call: ToolCall,
+        context: RuntimeContext | None,
+    ) -> tuple[RuntimeBudget, RuntimeUsage, list[str]]:
+        budget = context.runtime_budget if context is not None and context.runtime_budget is not None else self.runtime_budget_for_agent(agent_name)
+        usage = self.runtime_usage_for_context(context=context, tool_call=tool_call)
+        violations: list[str] = []
+        if usage.tool_calls_used >= budget.max_tool_calls:
+            violations.append("tool_call_budget_exceeded")
+        if usage.depth_used >= budget.max_depth:
+            violations.append("depth_limit_exceeded")
+        if usage.runtime_seconds >= budget.max_runtime_seconds:
+            violations.append("runtime_limit_exceeded")
+        if usage.estimated_cost_usd >= budget.max_cost_usd:
+            violations.append("cost_limit_exceeded")
+        return budget, usage, violations
+
+    def _evaluate_runtime_budget(
+        self,
+        *,
+        agent_name: str,
+        tool_call: ToolCall,
+        context: RuntimeContext | None,
+    ) -> PolicyDecision | None:
+        budget, usage, violations = self.runtime_budget_status(
+            agent_name=agent_name,
+            tool_call=tool_call,
+            context=context,
+        )
+        if context is not None:
+            context.runtime_budget = budget
+            context.runtime_usage = usage
+        if not violations:
+            return None
+        return PolicyDecision(
+            allowed=False,
+            reason=violations[0],
+            matched_rule="agent_limits",
+            risk_level="medium",
+        )
+
+    @staticmethod
+    def _budget_fields(data: dict[str, Any]) -> dict[str, Any]:
+        return {
+            key: data[key]
+            for key in ("max_tool_calls", "max_depth", "max_runtime_seconds", "max_cost_usd")
+            if key in data
+        }
 
     def _arguments_contain(self, data: Any, needle: str) -> bool:
         if isinstance(data, dict):
