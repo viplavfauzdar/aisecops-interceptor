@@ -59,6 +59,15 @@ class RuntimeEvent:
     capabilities: list[str] | None = None
     capability_risks: dict[str, str | None] | None = None
     provenance: list[InstructionProvenance] | None = None
+    budget_status: str | None = None
+    runtime_budget: dict[str, Any] | None = None
+    runtime_usage: dict[str, Any] | None = None
+    runtime_violations: list[str] | None = None
+    tool_calls_used: int | None = None
+    tool_calls_remaining: int | None = None
+    depth_used: int | None = None
+    runtime_seconds: float | None = None
+    estimated_cost_usd: float | None = None
     payload: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -152,6 +161,23 @@ class RuntimeEvent:
                     if isinstance(data.get("provenance"), list)
                     else None
                 ),
+                budget_status=str(data["budget_status"]) if data.get("budget_status") is not None else None,
+                runtime_budget=dict(data["runtime_budget"]) if isinstance(data.get("runtime_budget"), dict) else None,
+                runtime_usage=dict(data["runtime_usage"]) if isinstance(data.get("runtime_usage"), dict) else None,
+                runtime_violations=(
+                    [str(item) for item in data["runtime_violations"]]
+                    if isinstance(data.get("runtime_violations"), list)
+                    else None
+                ),
+                tool_calls_used=int(data["tool_calls_used"]) if data.get("tool_calls_used") is not None else None,
+                tool_calls_remaining=(
+                    int(data["tool_calls_remaining"]) if data.get("tool_calls_remaining") is not None else None
+                ),
+                depth_used=int(data["depth_used"]) if data.get("depth_used") is not None else None,
+                runtime_seconds=float(data["runtime_seconds"]) if data.get("runtime_seconds") is not None else None,
+                estimated_cost_usd=(
+                    float(data["estimated_cost_usd"]) if data.get("estimated_cost_usd") is not None else None
+                ),
                 payload=dict(data["payload"]) if isinstance(data.get("payload"), dict) else None,
             )
 
@@ -220,6 +246,23 @@ class RuntimeEvent:
                 if isinstance(data.get("provenance"), list)
                 else None
             ),
+            budget_status=str(data["budget_status"]) if data.get("budget_status") is not None else None,
+            runtime_budget=dict(data["runtime_budget"]) if isinstance(data.get("runtime_budget"), dict) else None,
+            runtime_usage=dict(data["runtime_usage"]) if isinstance(data.get("runtime_usage"), dict) else None,
+            runtime_violations=(
+                [str(item) for item in data["runtime_violations"]]
+                if isinstance(data.get("runtime_violations"), list)
+                else None
+            ),
+            tool_calls_used=int(data["tool_calls_used"]) if data.get("tool_calls_used") is not None else None,
+            tool_calls_remaining=(
+                int(data["tool_calls_remaining"]) if data.get("tool_calls_remaining") is not None else None
+            ),
+            depth_used=int(data["depth_used"]) if data.get("depth_used") is not None else None,
+            runtime_seconds=float(data["runtime_seconds"]) if data.get("runtime_seconds") is not None else None,
+            estimated_cost_usd=(
+                float(data["estimated_cost_usd"]) if data.get("estimated_cost_usd") is not None else None
+            ),
             payload=dict(data["payload"]) if isinstance(data.get("payload"), dict) else None,
         )
 
@@ -259,6 +302,15 @@ class RuntimeEvent:
         capabilities: list[str] | None = None,
         capability_risks: dict[str, str | None] | None = None,
         provenance: list[InstructionProvenance] | None = None,
+        budget_status: str | None = None,
+        runtime_budget: dict[str, Any] | None = None,
+        runtime_usage: dict[str, Any] | None = None,
+        runtime_violations: list[str] | None = None,
+        tool_calls_used: int | None = None,
+        tool_calls_remaining: int | None = None,
+        depth_used: int | None = None,
+        runtime_seconds: float | None = None,
+        estimated_cost_usd: float | None = None,
         payload: dict[str, Any] | None = None,
     ) -> "RuntimeEvent":
         return cls(
@@ -297,6 +349,15 @@ class RuntimeEvent:
             capabilities=capabilities,
             capability_risks=capability_risks,
             provenance=provenance,
+            budget_status=budget_status,
+            runtime_budget=runtime_budget,
+            runtime_usage=runtime_usage,
+            runtime_violations=runtime_violations,
+            tool_calls_used=tool_calls_used,
+            tool_calls_remaining=tool_calls_remaining,
+            depth_used=depth_used,
+            runtime_seconds=runtime_seconds,
+            estimated_cost_usd=estimated_cost_usd,
             payload=_sanitize_payload(payload) if payload is not None else None,
         )
 
@@ -324,6 +385,15 @@ class RuntimeEvent:
         audit_kind: str | None = None,
         capability_risks: dict[str, str | None] | None = None,
         provenance: list[InstructionProvenance] | None = None,
+        budget_status: str | None = None,
+        runtime_budget: dict[str, Any] | None = None,
+        runtime_usage: dict[str, Any] | None = None,
+        runtime_violations: list[str] | None = None,
+        tool_calls_used: int | None = None,
+        tool_calls_remaining: int | None = None,
+        depth_used: int | None = None,
+        runtime_seconds: float | None = None,
+        estimated_cost_usd: float | None = None,
         payload: dict[str, Any] | None = None,
     ) -> "RuntimeEvent":
         return cls.create(
@@ -359,6 +429,15 @@ class RuntimeEvent:
             capabilities=list(context.allowed_capabilities) if context.allowed_capabilities is not None else None,
             capability_risks=capability_risks,
             provenance=provenance if provenance is not None else (list(context.provenance) if context.provenance else None),
+            budget_status=budget_status,
+            runtime_budget=runtime_budget,
+            runtime_usage=runtime_usage,
+            runtime_violations=runtime_violations,
+            tool_calls_used=tool_calls_used,
+            tool_calls_remaining=tool_calls_remaining,
+            depth_used=depth_used,
+            runtime_seconds=runtime_seconds,
+            estimated_cost_usd=estimated_cost_usd,
             payload=payload,
         )
 
@@ -384,6 +463,15 @@ class RuntimeEvent:
         decision_stage: str | None = None,
         audit_kind: str | None = None,
         provenance: list[InstructionProvenance] | None = None,
+        budget_status: str | None = None,
+        runtime_budget: dict[str, Any] | None = None,
+        runtime_usage: dict[str, Any] | None = None,
+        runtime_violations: list[str] | None = None,
+        tool_calls_used: int | None = None,
+        tool_calls_remaining: int | None = None,
+        depth_used: int | None = None,
+        runtime_seconds: float | None = None,
+        estimated_cost_usd: float | None = None,
         payload: dict[str, Any] | None = None,
     ) -> "RuntimeEvent":
         return cls.create(
@@ -415,6 +503,15 @@ class RuntimeEvent:
             audit_kind=audit_kind,
             capabilities=list(context.allowed_capabilities) if context and context.allowed_capabilities is not None else None,
             provenance=provenance if provenance is not None else (list(context.provenance) if context and context.provenance else None),
+            budget_status=budget_status,
+            runtime_budget=runtime_budget,
+            runtime_usage=runtime_usage,
+            runtime_violations=runtime_violations,
+            tool_calls_used=tool_calls_used,
+            tool_calls_remaining=tool_calls_remaining,
+            depth_used=depth_used,
+            runtime_seconds=runtime_seconds,
+            estimated_cost_usd=estimated_cost_usd,
             payload=payload,
         )
 
@@ -444,6 +541,15 @@ class RuntimeEvent:
         capabilities: list[str] | None = None,
         capability_risks: dict[str, str | None] | None = None,
         provenance: list[InstructionProvenance] | None = None,
+        budget_status: str | None = None,
+        runtime_budget: dict[str, Any] | None = None,
+        runtime_usage: dict[str, Any] | None = None,
+        runtime_violations: list[str] | None = None,
+        tool_calls_used: int | None = None,
+        tool_calls_remaining: int | None = None,
+        depth_used: int | None = None,
+        runtime_seconds: float | None = None,
+        estimated_cost_usd: float | None = None,
         payload: dict[str, Any] | None = None,
     ) -> "RuntimeEvent":
         return cls.create(
@@ -483,5 +589,14 @@ class RuntimeEvent:
             ),
             capability_risks=capability_risks,
             provenance=provenance if provenance is not None else (list(context.provenance) if context and context.provenance else None),
+            budget_status=budget_status,
+            runtime_budget=runtime_budget,
+            runtime_usage=runtime_usage,
+            runtime_violations=runtime_violations,
+            tool_calls_used=tool_calls_used,
+            tool_calls_remaining=tool_calls_remaining,
+            depth_used=depth_used,
+            runtime_seconds=runtime_seconds,
+            estimated_cost_usd=estimated_cost_usd,
             payload=payload,
         )

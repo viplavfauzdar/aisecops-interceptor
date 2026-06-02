@@ -373,6 +373,21 @@ Example extracted plan:
 
 ---
 
+## Agent Runtime Controls
+
+AISecOps now enforces runtime governance controls in addition to security policy:
+
+- tool call budgets
+- execution depth limits
+- runtime limits
+- estimated cost budgets
+
+Limits can be configured globally with `agent_limits` and overridden per agent under `agents.<agent_name>`. Runtime usage is recorded in audit events and replay responses so operators can see budget status, usage summaries, and violations such as `tool_call_budget_exceeded`, `depth_limit_exceeded`, `runtime_limit_exceeded`, and `cost_limit_exceeded`.
+
+This expands governance from security enforcement into runtime control while keeping enforcement centralized in the interceptor and policy layers.
+
+---
+
 # High-level architecture
 
 At a high level, AISecOps Interceptor sits in the missing control plane layer between agent frameworks and real execution.

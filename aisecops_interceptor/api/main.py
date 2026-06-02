@@ -590,6 +590,15 @@ def _replay_timeline_entry_payload(entry) -> ReplayTimelineEntryModel:
         plan_steps=entry.plan_steps,
         model_output=entry.model_output,
         user_input=entry.user_input,
+        budget_status=entry.budget_status,
+        runtime_budget=entry.runtime_budget,
+        runtime_usage=entry.runtime_usage,
+        runtime_violations=entry.runtime_violations or None,
+        tool_calls_used=entry.tool_calls_used,
+        tool_calls_remaining=entry.tool_calls_remaining,
+        depth_used=entry.depth_used,
+        runtime_seconds=entry.runtime_seconds,
+        estimated_cost_usd=entry.estimated_cost_usd,
     )
 
 
@@ -720,8 +729,11 @@ def replay_trace_list(
                         "risk_level": summary.risk_level,
                         "requested_capabilities": summary.requested_capabilities,
                         "step_count": summary.step_count,
+                        "budget_status": summary.budget_status,
+                        "usage_summary": summary.usage_summary,
+                        "violations": summary.violations,
                     }
-                    if summary.plan_id is not None
+                    if summary.plan_id is not None or summary.usage_summary is not None
                     else {}
                 ),
             }
@@ -759,6 +771,9 @@ def replay_trace(trace_id: str):
         risk_level=result.risk_level,
         requested_capabilities=result.requested_capabilities,
         step_count=result.step_count,
+        budget_status=result.budget_status,
+        usage_summary=result.usage_summary,
+        violations=result.violations or None,
     ).model_dump(exclude_none=True)
 
 
@@ -788,6 +803,9 @@ def replay_trace_summary(trace_id: str):
         risk_level=summary.risk_level,
         requested_capabilities=summary.requested_capabilities,
         step_count=summary.step_count,
+        budget_status=summary.budget_status,
+        usage_summary=summary.usage_summary,
+        violations=summary.violations or None,
     ).model_dump(exclude_none=True)
 
 

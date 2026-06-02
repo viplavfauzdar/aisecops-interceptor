@@ -53,6 +53,7 @@ class AgentInterceptor:
                 approval_id=plan.approval_id,
                 execution_plan_id=plan.execution_plan_id,
                 **self._plan_event_fields(plan),
+                **self._budget_event_fields(context, tool_call),
                 decision_stage="execute",
                 capability_risks=capability_risks,
                 provenance=plan.provenance or None,
@@ -76,6 +77,7 @@ class AgentInterceptor:
                     approval_id=plan.approval_id,
                     execution_plan_id=plan.execution_plan_id,
                     **self._plan_event_fields(plan),
+                    **self._budget_event_fields(context, tool_call),
                     decision_stage="decision",
                     capability_risks=capability_risks,
                     audit_kind="capability",
@@ -115,6 +117,7 @@ class AgentInterceptor:
                     approval_id=approval_request.approval_id,
                     execution_plan_id=plan.execution_plan_id,
                     **self._plan_event_fields(plan),
+                    **self._budget_event_fields(context, tool_call),
                     decision_stage="decision",
                     capability_risks=capability_risks,
                     audit_kind="decision",
@@ -144,6 +147,7 @@ class AgentInterceptor:
                 approval_id=plan.approval_id,
                 execution_plan_id=plan.execution_plan_id,
                 **self._plan_event_fields(plan),
+                **self._budget_event_fields(context, tool_call),
                 decision_stage="decision",
                 capability_risks=capability_risks,
                 audit_kind="decision",
@@ -183,6 +187,7 @@ class AgentInterceptor:
                 approval_id=plan.approval_id,
                 execution_plan_id=plan.execution_plan_id,
                 **self._plan_event_fields(plan),
+                **self._budget_event_fields(context, tool_call),
                 decision_stage="execute",
                 capability_risks=capability_risks,
                 audit_kind="tool_execution",
@@ -201,6 +206,7 @@ class AgentInterceptor:
                 approval_id=plan.approval_id,
                 execution_plan_id=plan.execution_plan_id,
                 **self._plan_event_fields(plan),
+                **self._budget_event_fields(context, tool_call),
                 decision_stage="execute",
                 capability_risks=capability_risks,
                 provenance=plan.provenance or None,
@@ -235,6 +241,7 @@ class AgentInterceptor:
                 approval_id=request.approval_id,
                 execution_plan_id=plan.execution_plan_id,
                 **self._plan_event_fields(plan),
+                **self._budget_event_fields(request.context, request.context.to_tool_call()),
                 decision_stage="plan",
                 risk_level=plan.structured_plan.risk_level,
                 capability_risks=self._capability_risks_for_tool(request.context.tool_name),
@@ -283,6 +290,7 @@ class AgentInterceptor:
                     approval_id=plan.approval_id,
                     execution_plan_id=plan.execution_plan_id,
                     **self._plan_event_fields(plan),
+                    **self._budget_event_fields(context, tool_call),
                     decision_stage="evaluate",
                     capability_risks=capability_metadata and {
                         name: definition.risk for name, definition in capability_metadata.items()
@@ -344,6 +352,7 @@ class AgentInterceptor:
                 approval_id=plan.approval_id,
                 execution_plan_id=plan.execution_plan_id,
                 **self._plan_event_fields(plan),
+                **self._budget_event_fields(context, tool_call),
                 decision_stage="evaluate",
                 capability_risks=capability_metadata and {
                     name: definition.risk for name, definition in capability_metadata.items()
@@ -420,6 +429,36 @@ class AgentInterceptor:
             "plan_steps": [step.model_dump() for step in structured_plan.steps],
             "model_output": structured_plan.model_output,
             "user_input": structured_plan.user_input,
+        }
+
+    def _budget_event_fields(self, context: RuntimeContext, tool_call: ToolCall) -> dict[str, Any]:
+        if hasattr(self.policy_engine, "runtime_budget_status"):
+            budget, usage, violations = self.policy_engine.runtime_budget_status(
+                agent_name=context.agent_name,
+                tool_call=tool_call,
+                context=context,
+            )
+            context.runtime_budget = budget
+            context.runtime_usage = usage
+        else:
+            budget = context.runtime_budget
+            usage = context.runtime_usage
+            violations = []
+
+        if budget is None or usage is None:
+            return {}
+
+        remaining = max(0, budget.max_tool_calls - usage.tool_calls_used)
+        return {
+            "budget_status": "violated" if violations else "within_budget",
+            "runtime_budget": budget.to_dict(),
+            "runtime_usage": usage.to_dict(),
+            "runtime_violations": list(violations),
+            "tool_calls_used": usage.tool_calls_used,
+            "tool_calls_remaining": remaining,
+            "depth_used": usage.depth_used,
+            "runtime_seconds": usage.runtime_seconds,
+            "estimated_cost_usd": usage.estimated_cost_usd,
         }
 
     def execute(

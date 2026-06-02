@@ -46,6 +46,15 @@ class ReplayTimelineEntry:
     plan_steps: list[dict] = field(default_factory=list)
     model_output: str | None = None
     user_input: str | None = None
+    budget_status: str | None = None
+    runtime_budget: dict | None = None
+    runtime_usage: dict | None = None
+    runtime_violations: list[str] = field(default_factory=list)
+    tool_calls_used: int | None = None
+    tool_calls_remaining: int | None = None
+    depth_used: int | None = None
+    runtime_seconds: float | None = None
+    estimated_cost_usd: float | None = None
 
     @classmethod
     def from_event(cls, event: RuntimeEvent) -> "ReplayTimelineEntry":
@@ -68,6 +77,15 @@ class ReplayTimelineEntry:
             plan_steps=list(event.plan_steps or ()),
             model_output=event.model_output,
             user_input=event.user_input,
+            budget_status=event.budget_status,
+            runtime_budget=dict(event.runtime_budget) if event.runtime_budget is not None else None,
+            runtime_usage=dict(event.runtime_usage) if event.runtime_usage is not None else None,
+            runtime_violations=list(event.runtime_violations or ()),
+            tool_calls_used=event.tool_calls_used,
+            tool_calls_remaining=event.tool_calls_remaining,
+            depth_used=event.depth_used,
+            runtime_seconds=event.runtime_seconds,
+            estimated_cost_usd=event.estimated_cost_usd,
         )
 
 
@@ -95,6 +113,9 @@ class ReplaySummary:
     step_count: int | None = None
     first_seen: str | None = None
     last_seen: str | None = None
+    budget_status: str | None = None
+    usage_summary: dict | None = None
+    violations: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -112,6 +133,9 @@ class ReplayTraceResult:
     risk_level: str | None = None
     requested_capabilities: list[str] | None = None
     step_count: int | None = None
+    budget_status: str | None = None
+    usage_summary: dict | None = None
+    violations: list[str] = field(default_factory=list)
 
 
 class AuditReplayEngine:
@@ -172,6 +196,8 @@ class AuditReplayEngine:
         schema_versions: list[str] = []
         seen_versions: set[str] = set()
         plan_entry = next((entry for entry in timeline.entries if entry.plan_id is not None), None)
+        usage_entry = next((entry for entry in reversed(timeline.entries) if entry.runtime_usage is not None), None)
+        violations: list[str] = []
 
         for entry in timeline.entries:
             version = entry.schema_version or "legacy"
@@ -180,6 +206,9 @@ class AuditReplayEngine:
                 schema_versions.append(version)
             for item in entry.provenance:
                 trust_summary[item.trust_level] = trust_summary.get(item.trust_level, 0) + 1
+            for violation in entry.runtime_violations:
+                if violation not in violations:
+                    violations.append(violation)
 
         return ReplaySummary(
             trace_id=timeline.trace_id,
@@ -198,6 +227,13 @@ class AuditReplayEngine:
             step_count=len(plan_entry.plan_steps) if plan_entry is not None else None,
             first_seen=timeline.entries[0].timestamp if timeline.entries else None,
             last_seen=timeline.entries[-1].timestamp if timeline.entries else None,
+            budget_status=(
+                "violated"
+                if violations
+                else (usage_entry.budget_status if usage_entry is not None else None)
+            ),
+            usage_summary=dict(usage_entry.runtime_usage) if usage_entry is not None and usage_entry.runtime_usage is not None else None,
+            violations=violations,
         )
 
     @staticmethod
@@ -226,6 +262,9 @@ class AuditReplayEngine:
             risk_level=summary.risk_level,
             requested_capabilities=summary.requested_capabilities,
             step_count=summary.step_count,
+            budget_status=summary.budget_status,
+            usage_summary=summary.usage_summary,
+            violations=summary.violations,
         )
 
     def list_traces(

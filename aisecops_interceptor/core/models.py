@@ -26,6 +26,38 @@ class InterceptionRequest:
 
 
 @dataclass(slots=True)
+class RuntimeBudget:
+    max_tool_calls: int = 20
+    max_depth: int = 5
+    max_runtime_seconds: float = 60
+    max_cost_usd: float = 2.00
+
+    def to_dict(self) -> dict[str, int | float]:
+        return {
+            "max_tool_calls": self.max_tool_calls,
+            "max_depth": self.max_depth,
+            "max_runtime_seconds": self.max_runtime_seconds,
+            "max_cost_usd": self.max_cost_usd,
+        }
+
+
+@dataclass(slots=True)
+class RuntimeUsage:
+    tool_calls_used: int = 0
+    depth_used: int = 0
+    runtime_seconds: float = 0
+    estimated_cost_usd: float = 0
+
+    def to_dict(self) -> dict[str, int | float]:
+        return {
+            "tool_calls_used": self.tool_calls_used,
+            "depth_used": self.depth_used,
+            "runtime_seconds": self.runtime_seconds,
+            "estimated_cost_usd": self.estimated_cost_usd,
+        }
+
+
+@dataclass(slots=True)
 class InstructionProvenance:
     source_type: str
     trust_level: str
@@ -163,6 +195,15 @@ class ReplayTimelineEntryModel(BaseModel):
     plan_steps: list[dict[str, Any]] = Field(default_factory=list)
     model_output: str | None = None
     user_input: str | None = None
+    budget_status: str | None = None
+    runtime_budget: dict[str, Any] | None = None
+    runtime_usage: dict[str, Any] | None = None
+    runtime_violations: list[str] | None = None
+    tool_calls_used: int | None = None
+    tool_calls_remaining: int | None = None
+    depth_used: int | None = None
+    runtime_seconds: float | None = None
+    estimated_cost_usd: float | None = None
 
 
 class ReplayTraceResponseModel(BaseModel):
@@ -179,6 +220,9 @@ class ReplayTraceResponseModel(BaseModel):
     risk_level: str | None = None
     requested_capabilities: list[str] | None = None
     step_count: int | None = None
+    budget_status: str | None = None
+    usage_summary: dict[str, Any] | None = None
+    violations: list[str] | None = None
 
 
 class ReplaySummaryResponseModel(BaseModel):
@@ -194,6 +238,9 @@ class ReplaySummaryResponseModel(BaseModel):
     risk_level: str | None = None
     requested_capabilities: list[str] | None = None
     step_count: int | None = None
+    budget_status: str | None = None
+    usage_summary: dict[str, Any] | None = None
+    violations: list[str] | None = None
 
 
 @dataclass(slots=True)

@@ -3,6 +3,18 @@
 ## Scope
 These instructions apply to the repository rooted at `/Users/viplavfauzdar/Projects/aisecops-interceptor`.
 
+## Session startup
+
+Before making any changes:
+
+1. Read `.codex-handoff.md`.
+2. Verify:
+   - current branch
+   - git status
+   - latest commits
+3. Compare repository state with `.codex-handoff.md`.
+4. Report any drift before editing files.
+
 ## Project intent
 - This repo implements a runtime security interceptor for AI agents.
 - Keep security logic centralized in the interceptor and policy layers.
@@ -90,6 +102,19 @@ Pushes should normally occur only after a logical milestone (for example: contex
 
 If a task only inspects or verifies the codebase and does not modify files, **do not create a commit**.
 
+## Session shutdown
+
+When a material task is completed:
+
+1. Update `.codex-handoff.md` if:
+   - roadmap changed
+   - release status changed
+   - branch status changed
+   - major features were added
+   - ownership changed
+
+2. Commit the handoff update with the completed task when appropriate.
+
 ## Response expectations
 - When work is complete, report:
   1. changed files
@@ -97,6 +122,62 @@ If a task only inspects or verifies the codebase and does not modify files, **do
   3. test/demo results
   4. any remaining risks or assumptions
 
+
+## Ownership
+
+Claude Code owns:
+- dashboard UI
+- visualizations
+- UX flows
+- screenshots
+
+Codex owns:
+- runtime engine
+- planning
+- policy engine
+- replay engine
+- MCP integration
+- local enforcement
+- documentation
+- release engineering
+
+Do not modify dashboard UI unless explicitly instructed.
+
+
+## Roadmap awareness
+
+Current roadmap:
+
+- v0.8.1: Agent Runtime Controls
+- v0.9.0: Local Enforcement Mode
+- v0.9.5: MCP Proxy Mode
+- v1.0.0: Runtime Governance Platform
+
+## Release progression
+
+Completed milestones:
+
+- v0.7.0: Replay Audit UI + Execution Graphs
+- v0.8.0: Structured Plan Extraction
+- v0.8.1: Agent Runtime Controls
+
+Planned milestones:
+
+- v0.9.0: Local Enforcement Mode
+- v0.9.5: MCP Proxy Mode
+- v1.0.0: Runtime Governance Platform
+
+## Scope control
+
+Prefer extending existing runtime models.
+
+Avoid introducing parallel abstractions when:
+- RuntimeContext already exists
+- ExecutionPlan already exists
+- RuntimeBudget already exists
+- RuntimeUsage already exists
+
+Extend canonical models instead.
 
 ## Architecture goals
 The long‑term design goal is to keep AISecOps as a **framework‑agnostic AI security runtime**.
