@@ -185,7 +185,50 @@ def test_new_replay_diff_api(tmp_path, monkeypatch):
     response = TestClient(app).get(f"/replay/{trace_id}/diff")
 
     assert response.status_code == 200
-    assert response.json()["governance_result"] == "matched"
+    payload = response.json()
+    assert payload["governance_result"] == "matched"
+    for field in (
+        "trace_id",
+        "plan_id",
+        "planned_tool",
+        "planned_intent",
+        "planned_capabilities",
+        "planned_risk_level",
+        "policy_decision",
+        "execution_outcome",
+        "governance_result",
+        "mismatches",
+        "violations",
+        "summary",
+    ):
+        assert field in payload
+
+
+def test_replay_diff_openapi_schema_documents_response():
+    schema = TestClient(app).get("/openapi.json").json()
+    response_schema = schema["paths"]["/replay/{trace_id}/diff"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+
+    assert response_schema["$ref"] == "#/components/schemas/ReplayDiffResponseModel"
+    diff_schema = schema["components"]["schemas"]["ReplayDiffResponseModel"]
+    mismatch_ref = diff_schema["properties"]["mismatches"]["items"]["$ref"]
+    mismatch_schema = schema["components"]["schemas"][mismatch_ref.rsplit("/", 1)[-1]]
+    for field in (
+        "trace_id",
+        "plan_id",
+        "planned_tool",
+        "planned_intent",
+        "planned_capabilities",
+        "planned_risk_level",
+        "policy_decision",
+        "execution_outcome",
+        "governance_result",
+        "mismatches",
+        "violations",
+        "summary",
+    ):
+        assert field in diff_schema["properties"]
+    for field in ("type", "expected", "actual", "severity", "reason"):
+        assert field in mismatch_schema["properties"]
 
 
 def test_replay_diff_backward_compatibility_with_old_audit_events(tmp_path):

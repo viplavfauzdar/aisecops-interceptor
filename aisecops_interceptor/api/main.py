@@ -19,6 +19,7 @@ from aisecops_interceptor.core.models import (
     ExplainTraceModel,
     InterceptionRequest,
     InstructionProvenance,
+    ReplayDiffResponseModel,
     ReplaySummaryResponseModel,
     ReplayTimelineEntryModel,
     ReplayTraceResponseModel,
@@ -844,13 +845,17 @@ def replay_trace_summary(trace_id: str):
     ).model_dump(exclude_none=True)
 
 
-@app.get("/replay/{trace_id}/diff")
+@app.get(
+    "/replay/{trace_id}/diff",
+    response_model=ReplayDiffResponseModel,
+    response_model_exclude_none=True,
+)
 def replay_trace_diff(trace_id: str) -> dict:
     try:
         diff = replay_diff_engine.diff_trace(replay_audit_file_path(), trace_id)
     except (AuditFileNotFoundError, TraceNotFoundError) as exc:
         return _replay_not_found_response(str(exc))
-    return diff.to_dict()
+    return ReplayDiffResponseModel.model_validate(diff.to_dict()).model_dump(exclude_none=True)
 
 
 

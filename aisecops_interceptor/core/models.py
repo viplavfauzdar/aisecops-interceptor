@@ -299,6 +299,29 @@ class ReplaySummaryResponseModel(BaseModel):
     violations: list[str] | None = None
 
 
+class ReplayMismatchModel(BaseModel):
+    type: str
+    expected: str | None = None
+    actual: str | None = None
+    severity: str
+    reason: str
+
+
+class ReplayDiffResponseModel(BaseModel):
+    trace_id: str
+    plan_id: str | None = None
+    planned_tool: str | None = None
+    planned_intent: str | None = None
+    planned_capabilities: list[str] = Field(default_factory=list)
+    planned_risk_level: str | None = None
+    policy_decision: str | None = None
+    execution_outcome: str | None = None
+    governance_result: str
+    mismatches: list[ReplayMismatchModel] = Field(default_factory=list)
+    violations: list[str] = Field(default_factory=list)
+    summary: str
+
+
 @dataclass(slots=True)
 class ApprovalRequest:
     approval_id: str
