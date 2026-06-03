@@ -408,6 +408,31 @@ Local enforcement writes structured JSONL audit events to the requested `--audit
 
 ---
 
+## MCP Policy Proxy
+
+AISecOps can evaluate Model Context Protocol tool invocations before execution. The v0.9.5 foundation is a policy proxy, not a full MCP gateway: it receives an MCP tool invocation shape, maps the tool to a capability, runs the existing plan extraction, capability validation, runtime budget checks, and policy engine, then writes replay-compatible audit events.
+
+Example:
+
+```bash
+python -m aisecops_interceptor.mcp.proxy \
+  --client-id codex \
+  --server filesystem \
+  --tool filesystem.write \
+  --args '{"path":"test.txt"}'
+```
+
+Current scope:
+
+- policy enforcement
+- capability validation
+- audit logging
+- replay compatibility
+
+Future work will add full MCP gateway mode.
+
+---
+
 # High-level architecture
 
 At a high level, AISecOps Interceptor sits in the missing control plane layer between agent frameworks and real execution.
