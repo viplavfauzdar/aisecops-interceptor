@@ -195,6 +195,10 @@ class ReplayTimelineEntryModel(BaseModel):
     plan_steps: list[dict[str, Any]] = Field(default_factory=list)
     model_output: str | None = None
     user_input: str | None = None
+    protocol: str | None = None
+    client_id: str | None = None
+    server_name: str | None = None
+    capability: str | None = None
     budget_status: str | None = None
     runtime_budget: dict[str, Any] | None = None
     runtime_usage: dict[str, Any] | None = None
@@ -220,6 +224,10 @@ class ReplayTraceResponseModel(BaseModel):
     risk_level: str | None = None
     requested_capabilities: list[str] | None = None
     step_count: int | None = None
+    protocol: str | None = None
+    client_id: str | None = None
+    server_name: str | None = None
+    capability: str | None = None
     budget_status: str | None = None
     usage_summary: dict[str, Any] | None = None
     violations: list[str] | None = None
@@ -238,6 +246,10 @@ class ReplaySummaryResponseModel(BaseModel):
     risk_level: str | None = None
     requested_capabilities: list[str] | None = None
     step_count: int | None = None
+    protocol: str | None = None
+    client_id: str | None = None
+    server_name: str | None = None
+    capability: str | None = None
     budget_status: str | None = None
     usage_summary: dict[str, Any] | None = None
     violations: list[str] | None = None

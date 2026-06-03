@@ -51,6 +51,7 @@ dev = [
 
 [project.scripts]
 aisecops-local = "aisecops_interceptor.local.cli:main"
+aisecops-mcp-proxy = "aisecops_interceptor.mcp.proxy:main"
 aisecops-replay = "aisecops_interceptor.replay.cli:main"
 
 [tool.setuptools.packages.find]

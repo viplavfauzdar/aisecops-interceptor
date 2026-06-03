@@ -59,6 +59,10 @@ class RuntimeEvent:
     capabilities: list[str] | None = None
     capability_risks: dict[str, str | None] | None = None
     provenance: list[InstructionProvenance] | None = None
+    protocol: str | None = None
+    client_id: str | None = None
+    server_name: str | None = None
+    capability: str | None = None
     budget_status: str | None = None
     runtime_budget: dict[str, Any] | None = None
     runtime_usage: dict[str, Any] | None = None
@@ -161,6 +165,10 @@ class RuntimeEvent:
                     if isinstance(data.get("provenance"), list)
                     else None
                 ),
+                protocol=str(data["protocol"]) if data.get("protocol") is not None else None,
+                client_id=str(data["client_id"]) if data.get("client_id") is not None else None,
+                server_name=str(data["server_name"]) if data.get("server_name") is not None else None,
+                capability=str(data["capability"]) if data.get("capability") is not None else None,
                 budget_status=str(data["budget_status"]) if data.get("budget_status") is not None else None,
                 runtime_budget=dict(data["runtime_budget"]) if isinstance(data.get("runtime_budget"), dict) else None,
                 runtime_usage=dict(data["runtime_usage"]) if isinstance(data.get("runtime_usage"), dict) else None,
@@ -246,6 +254,10 @@ class RuntimeEvent:
                 if isinstance(data.get("provenance"), list)
                 else None
             ),
+            protocol=str(data["protocol"]) if data.get("protocol") is not None else None,
+            client_id=str(data["client_id"]) if data.get("client_id") is not None else None,
+            server_name=str(data["server_name"]) if data.get("server_name") is not None else None,
+            capability=str(data["capability"]) if data.get("capability") is not None else None,
             budget_status=str(data["budget_status"]) if data.get("budget_status") is not None else None,
             runtime_budget=dict(data["runtime_budget"]) if isinstance(data.get("runtime_budget"), dict) else None,
             runtime_usage=dict(data["runtime_usage"]) if isinstance(data.get("runtime_usage"), dict) else None,
@@ -302,6 +314,10 @@ class RuntimeEvent:
         capabilities: list[str] | None = None,
         capability_risks: dict[str, str | None] | None = None,
         provenance: list[InstructionProvenance] | None = None,
+        protocol: str | None = None,
+        client_id: str | None = None,
+        server_name: str | None = None,
+        capability: str | None = None,
         budget_status: str | None = None,
         runtime_budget: dict[str, Any] | None = None,
         runtime_usage: dict[str, Any] | None = None,
@@ -349,6 +365,10 @@ class RuntimeEvent:
             capabilities=capabilities,
             capability_risks=capability_risks,
             provenance=provenance,
+            protocol=protocol,
+            client_id=client_id,
+            server_name=server_name,
+            capability=capability,
             budget_status=budget_status,
             runtime_budget=runtime_budget,
             runtime_usage=runtime_usage,
@@ -385,6 +405,10 @@ class RuntimeEvent:
         audit_kind: str | None = None,
         capability_risks: dict[str, str | None] | None = None,
         provenance: list[InstructionProvenance] | None = None,
+        protocol: str | None = None,
+        client_id: str | None = None,
+        server_name: str | None = None,
+        capability: str | None = None,
         budget_status: str | None = None,
         runtime_budget: dict[str, Any] | None = None,
         runtime_usage: dict[str, Any] | None = None,
@@ -429,6 +453,10 @@ class RuntimeEvent:
             capabilities=list(context.allowed_capabilities) if context.allowed_capabilities is not None else None,
             capability_risks=capability_risks,
             provenance=provenance if provenance is not None else (list(context.provenance) if context.provenance else None),
+            protocol=protocol,
+            client_id=client_id,
+            server_name=server_name,
+            capability=capability,
             budget_status=budget_status,
             runtime_budget=runtime_budget,
             runtime_usage=runtime_usage,
@@ -463,6 +491,10 @@ class RuntimeEvent:
         decision_stage: str | None = None,
         audit_kind: str | None = None,
         provenance: list[InstructionProvenance] | None = None,
+        protocol: str | None = None,
+        client_id: str | None = None,
+        server_name: str | None = None,
+        capability: str | None = None,
         budget_status: str | None = None,
         runtime_budget: dict[str, Any] | None = None,
         runtime_usage: dict[str, Any] | None = None,
@@ -503,6 +535,10 @@ class RuntimeEvent:
             audit_kind=audit_kind,
             capabilities=list(context.allowed_capabilities) if context and context.allowed_capabilities is not None else None,
             provenance=provenance if provenance is not None else (list(context.provenance) if context and context.provenance else None),
+            protocol=protocol,
+            client_id=client_id,
+            server_name=server_name,
+            capability=capability,
             budget_status=budget_status,
             runtime_budget=runtime_budget,
             runtime_usage=runtime_usage,
@@ -541,6 +577,10 @@ class RuntimeEvent:
         capabilities: list[str] | None = None,
         capability_risks: dict[str, str | None] | None = None,
         provenance: list[InstructionProvenance] | None = None,
+        protocol: str | None = None,
+        client_id: str | None = None,
+        server_name: str | None = None,
+        capability: str | None = None,
         budget_status: str | None = None,
         runtime_budget: dict[str, Any] | None = None,
         runtime_usage: dict[str, Any] | None = None,
@@ -589,6 +629,10 @@ class RuntimeEvent:
             ),
             capability_risks=capability_risks,
             provenance=provenance if provenance is not None else (list(context.provenance) if context and context.provenance else None),
+            protocol=protocol,
+            client_id=client_id,
+            server_name=server_name,
+            capability=capability,
             budget_status=budget_status,
             runtime_budget=runtime_budget,
             runtime_usage=runtime_usage,

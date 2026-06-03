@@ -46,6 +46,10 @@ class ReplayTimelineEntry:
     plan_steps: list[dict] = field(default_factory=list)
     model_output: str | None = None
     user_input: str | None = None
+    protocol: str | None = None
+    client_id: str | None = None
+    server_name: str | None = None
+    capability: str | None = None
     budget_status: str | None = None
     runtime_budget: dict | None = None
     runtime_usage: dict | None = None
@@ -77,6 +81,10 @@ class ReplayTimelineEntry:
             plan_steps=list(event.plan_steps or ()),
             model_output=event.model_output,
             user_input=event.user_input,
+            protocol=event.protocol,
+            client_id=event.client_id,
+            server_name=event.server_name,
+            capability=event.capability,
             budget_status=event.budget_status,
             runtime_budget=dict(event.runtime_budget) if event.runtime_budget is not None else None,
             runtime_usage=dict(event.runtime_usage) if event.runtime_usage is not None else None,
@@ -113,6 +121,10 @@ class ReplaySummary:
     step_count: int | None = None
     first_seen: str | None = None
     last_seen: str | None = None
+    protocol: str | None = None
+    client_id: str | None = None
+    server_name: str | None = None
+    capability: str | None = None
     budget_status: str | None = None
     usage_summary: dict | None = None
     violations: list[str] = field(default_factory=list)
@@ -133,6 +145,10 @@ class ReplayTraceResult:
     risk_level: str | None = None
     requested_capabilities: list[str] | None = None
     step_count: int | None = None
+    protocol: str | None = None
+    client_id: str | None = None
+    server_name: str | None = None
+    capability: str | None = None
     budget_status: str | None = None
     usage_summary: dict | None = None
     violations: list[str] = field(default_factory=list)
@@ -196,6 +212,7 @@ class AuditReplayEngine:
         schema_versions: list[str] = []
         seen_versions: set[str] = set()
         plan_entry = next((entry for entry in timeline.entries if entry.plan_id is not None), None)
+        protocol_entry = next((entry for entry in reversed(timeline.entries) if entry.protocol is not None), None)
         usage_entry = next((entry for entry in reversed(timeline.entries) if entry.runtime_usage is not None), None)
         violations: list[str] = []
 
@@ -227,6 +244,10 @@ class AuditReplayEngine:
             step_count=len(plan_entry.plan_steps) if plan_entry is not None else None,
             first_seen=timeline.entries[0].timestamp if timeline.entries else None,
             last_seen=timeline.entries[-1].timestamp if timeline.entries else None,
+            protocol=protocol_entry.protocol if protocol_entry is not None else None,
+            client_id=protocol_entry.client_id if protocol_entry is not None else None,
+            server_name=protocol_entry.server_name if protocol_entry is not None else None,
+            capability=protocol_entry.capability if protocol_entry is not None else None,
             budget_status=(
                 "violated"
                 if violations
@@ -262,6 +283,10 @@ class AuditReplayEngine:
             risk_level=summary.risk_level,
             requested_capabilities=summary.requested_capabilities,
             step_count=summary.step_count,
+            protocol=summary.protocol,
+            client_id=summary.client_id,
+            server_name=summary.server_name,
+            capability=summary.capability,
             budget_status=summary.budget_status,
             usage_summary=summary.usage_summary,
             violations=summary.violations,
