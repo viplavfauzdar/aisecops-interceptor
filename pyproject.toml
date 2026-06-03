@@ -50,6 +50,7 @@ dev = [
 ]
 
 [project.scripts]
+aisecops-local = "aisecops_interceptor.local.cli:main"
 aisecops-replay = "aisecops_interceptor.replay.cli:main"
 
 [tool.setuptools.packages.find]

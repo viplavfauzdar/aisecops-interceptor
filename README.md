@@ -388,6 +388,26 @@ This expands governance from security enforcement into runtime control while kee
 
 ---
 
+## Local Enforcement Mode
+
+AISecOps can now run beside local agents, local LLM runtimes, and desktop automation tools without requiring the FastAPI gateway. Local mode evaluates tool calls through the same interceptor, policy engine, capability registry, plan extraction, runtime budgets, and audit event model used by the API runtime.
+
+Example:
+
+```bash
+python -m aisecops_interceptor.local.cli \
+  --policy ./policies/local.yaml \
+  --agent-name jeeves-local \
+  --tool-name restart_service \
+  --args '{"service":"orders"}' \
+  --audit-log ./audit.local.jsonl \
+  --dry-run
+```
+
+Local enforcement writes structured JSONL audit events to the requested `--audit-log` path. These events include trace IDs, event IDs, schema versions, provenance, plan metadata, decisions, and runtime budget metadata, and remain compatible with the existing replay engine. This enables local replay now, with optional central sync planned for a future milestone.
+
+---
+
 # High-level architecture
 
 At a high level, AISecOps Interceptor sits in the missing control plane layer between agent frameworks and real execution.
