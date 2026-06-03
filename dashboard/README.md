@@ -1,7 +1,35 @@
-# AISecOps Interceptor — Replay / Audit UI
+# AISecOps Interceptor — Runtime Governance Console
 
-Read-only forensic investigation console for AISecOps Interceptor v0.7.0.
-Visualizes intercepted agentic AI events: provenance, policy decisions, tool execution, and final outcomes.
+Read-only governance and forensic investigation console for AISecOps Interceptor v1.0.0.
+
+Visualizes:
+- agent activity
+- provenance
+- policy decisions
+- runtime controls
+- tool execution
+- replay analysis
+- governance outcomes
+
+## Platform Scope
+
+The dashboard is the visual investigation layer for the AISecOps Runtime Governance Platform.
+
+Current capabilities:
+
+- Replay investigation
+- Audit trail analysis
+- Provenance inspection
+- Execution graph visualization
+- Runtime governance review
+
+Planned capabilities:
+
+- Replay Diff Viewer
+- Compliance Evidence Viewer
+- Agent Identity Explorer
+- MCP Activity Investigation
+- Governance Reporting
 
 ---
 
@@ -73,13 +101,14 @@ Set in `dashboard/.env`. The `.env.example` file contains the default values.
 
 ---
 
-## API endpoints consumed
+## Runtime Governance APIs
 
 | Method | Path | Used by |
 |---|---|---|
 | `GET` | `/replay` | Trace list page |
 | `GET` | `/replay/{trace_id}` | Trace detail — timeline and graph |
 | `GET` | `/replay/{trace_id}/summary` | Trace detail — summary cards |
+| `GET` | `/replay/{trace_id}/diff` | Replay diff and governance analysis |
 
 No authentication. No write operations. All requests are read-only.
 
@@ -113,6 +142,13 @@ Two tabs:
 - Node and edge colors vary by stage type and decision outcome
 - Click any node with a source event → opens event drawer
 - Handles block, allow, approval, and dry_run trace shapes; graceful empty state if no events
+
+Future investigation views:
+
+- Replay Diff
+- Compliance Evidence
+- Agent Identity
+- MCP Activity
 
 ### Event drawer
 
@@ -171,7 +207,7 @@ Output in `dashboard/dist/`. No test suite currently configured.
 
 ---
 
-## v0.7.0 feature summary
+## Runtime Governance Console Summary
 
 - Trace list with decision / tool / provenance trust filters
 - Timeline with color-coded decision stage badges (plan / evaluate / execute / approval)
@@ -181,3 +217,29 @@ Output in `dashboard/dist/`. No test suite currently configured.
 - Event drawer: provenance section, Copy ID, Copy JSON, raw JSON block
 - Summary cards: final decision, tool, event count, first seen, last seen, trust summary
 - Empty, loading, and error states on all pages
+- Foundation for Replay Diff visualization
+- Foundation for Compliance Evidence review
+- Foundation for Agent Identity investigation
+- Foundation for MCP governance workflows
+
+---
+
+## Platform Alignment
+
+The dashboard supports the AISecOps Runtime Governance Platform vision:
+
+Security
+- Capability enforcement visibility
+- Policy decision visibility
+
+Compliance
+- Audit investigation
+- Evidence generation workflows
+
+Cost Control
+- Runtime budget visibility (future)
+
+Observability
+- Replay analysis
+- Execution graphs
+- Governance investigation
