@@ -1,6 +1,6 @@
 # 🛡️ AISecOps Interceptor
-### Runtime security and governance layer for AI agents.
-**A framework-agnostic runtime control plane for agent security, policy enforcement, and auditability.**
+### The Runtime Governance Platform for Agentic AI
+**A framework-agnostic runtime control plane for security, compliance, cost control, and observability across AI agents, MCP tools, and autonomous workflows.**
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.11–3.13](https://img.shields.io/badge/python-3.11--3.13-blue.svg)](https://www.python.org/downloads/)
@@ -36,6 +36,43 @@ AISecOps Interceptor provides a framework-agnostic control plane to detect promp
 - teams deploying large language model (LLM) powered automation
 - security engineers reviewing agent safety
 - platform teams building internal AI infrastructure
+
+## Positioning
+
+AISecOps is not:
+
+- a prompt filter
+- an AI firewall
+- a model gateway
+
+AISecOps is:
+
+- runtime governance
+- execution security
+- compliance evidence
+- agent observability
+
+## What Makes AISecOps Different
+
+AISecOps governs agent behavior before execution.
+
+Unlike prompt filters, AI firewalls, or model gateways, AISecOps operates at runtime:
+
+- Plan Extraction
+- Capability Validation
+- Policy Enforcement
+- Runtime Budgets
+- Local Enforcement
+- MCP Policy Proxy
+- Replay Diff Analysis
+- Compliance Evidence Export
+
+This allows teams to understand:
+
+- what an agent intended to do
+- what policy decided
+- what actually happened
+- whether governance controls worked
 
 ## CI and Security
 
@@ -129,6 +166,17 @@ Most agent frameworks still leave runtime governance to application code.
 That means developers often have to bolt on security checks, approval workflows, prompt filtering, and audit logging themselves.
 
 AISecOps Interceptor provides that missing runtime layer.
+
+AISecOps has evolved beyond runtime security.
+
+The platform now provides:
+
+- Security
+- Compliance
+- Cost Control
+- Observability
+
+for agentic AI systems.
 
 It helps teams:
 
@@ -309,6 +357,34 @@ The interceptor assumes:
 
 ---
 
+
+## Core Platform Pillars
+
+### Security
+
+- Prompt Guards
+- Capability Enforcement
+- Policy Evaluation
+
+### Compliance
+
+- Audit Trails
+- Replay Engine
+- Compliance Evidence Export
+
+### Cost Control
+
+- Runtime Budgets
+- Tool Call Limits
+- Execution Limits
+
+### Observability
+
+- Replay APIs
+- Replay Diff Engine
+- Runtime Investigation
+
+
 # Included capabilities
 
 Current implementation includes:
@@ -433,6 +509,44 @@ Future work will add full MCP gateway mode.
 
 ---
 
+## Runtime Governance Platform
+
+The v1.0.0 foundation ties plan extraction, policy decisions, runtime usage, replay, MCP, and local enforcement into governance evidence for agentic AI systems.
+
+It adds:
+
+- Replay Diff Engine to compare planned intent, policy decisions, and execution outcomes
+- Agent Identity Layer for trust level, environment, capabilities, and agent-specific runtime limits
+- Compliance Evidence Export for JSON and Markdown evidence packages
+- Risk Explanation helpers for human-readable governance summaries
+- continued Local Enforcement Mode and MCP Policy Proxy support
+
+Replay diff CLI:
+
+```bash
+python -m aisecops_interceptor.replay.diff \
+  --trace-id TRACE_ID \
+  --audit-log ./audit.jsonl
+```
+
+Evidence export CLI:
+
+```bash
+python -m aisecops_interceptor.evidence.cli \
+  --trace-id TRACE_ID \
+  --audit-log ./audit.jsonl \
+  --format markdown \
+  --output evidence.md
+```
+
+Replay diff API:
+
+```http
+GET /replay/{trace_id}/diff
+```
+
+---
+
 # High-level architecture
 
 At a high level, AISecOps Interceptor sits in the missing control plane layer between agent frameworks and real execution.
@@ -440,18 +554,26 @@ At a high level, AISecOps Interceptor sits in the missing control plane layer be
 ```mermaid
 flowchart TD
 
-A[Agent Runtime / Framework]
-A --> B[Framework Adapter]
-B --> C[Runtime Context Builder]
-C --> D[Capability Gate]
-D --> E[AISecOps Interceptor]
-E --> F[Plan]
-F --> G[Evaluate]
-G --> H[Decision]
-H --> I[Executor]
-I --> J[Tool / API Execution]
-J --> K[Audit Event]
+A[Agent Runtime]
+A --> B[Plan Extraction]
+B --> C[Capability Validation]
+C --> D[Policy Evaluation]
+D --> E[Runtime Controls]
+E --> F[Execution]
+F --> G[Audit Events]
+G --> H[Replay Engine]
+H --> I[Replay Diff]
+I --> J[Evidence Export]
 ```
+
+This architecture reflects the v1.0 Runtime Governance Platform model.
+
+AISecOps now provides end-to-end governance visibility across:
+
+- planned intent
+- policy decisions
+- execution outcomes
+- compliance evidence
 
 This is the core execution path developers integrate with:
 

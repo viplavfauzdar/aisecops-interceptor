@@ -58,6 +58,41 @@ class RuntimeUsage:
 
 
 @dataclass(slots=True)
+class AgentIdentity:
+    agent_id: str
+    agent_name: str
+    trust_level: str = "unspecified"
+    environment: str = "dev"
+    allowed_capabilities: list[str] = field(default_factory=list)
+    max_tool_calls: int | None = None
+    max_depth: int | None = None
+    max_runtime_seconds: float | None = None
+    max_cost_usd: float | None = None
+
+    def runtime_budget_overrides(self) -> dict[str, int | float]:
+        values: dict[str, int | float] = {}
+        if self.max_tool_calls is not None:
+            values["max_tool_calls"] = self.max_tool_calls
+        if self.max_depth is not None:
+            values["max_depth"] = self.max_depth
+        if self.max_runtime_seconds is not None:
+            values["max_runtime_seconds"] = self.max_runtime_seconds
+        if self.max_cost_usd is not None:
+            values["max_cost_usd"] = self.max_cost_usd
+        return values
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "agent_id": self.agent_id,
+            "agent_name": self.agent_name,
+            "trust_level": self.trust_level,
+            "environment": self.environment,
+            "allowed_capabilities": list(self.allowed_capabilities),
+            **self.runtime_budget_overrides(),
+        }
+
+
+@dataclass(slots=True)
 class InstructionProvenance:
     source_type: str
     trust_level: str
@@ -183,6 +218,9 @@ class ReplayTimelineEntryModel(BaseModel):
     event_id: str | None = None
     decision_stage: str | None = None
     agent_name: str | None = None
+    agent_id: str | None = None
+    agent_trust_level: str | None = None
+    agent_environment: str | None = None
     tool_name: str | None = None
     decision: str
     reason: str | None = None
@@ -219,6 +257,9 @@ class ReplayTraceResponseModel(BaseModel):
     provenance_summary: dict[str, int] = Field(default_factory=dict)
     final_decision: str | None = None
     final_reason: str | None = None
+    agent_id: str | None = None
+    agent_trust_level: str | None = None
+    agent_environment: str | None = None
     plan_id: str | None = None
     intent: str | None = None
     risk_level: str | None = None
@@ -241,6 +282,9 @@ class ReplaySummaryResponseModel(BaseModel):
     final_reason: str | None = None
     provenance_trust_summary: dict[str, int] = Field(default_factory=dict)
     schema_versions_observed: list[str] = Field(default_factory=list)
+    agent_id: str | None = None
+    agent_trust_level: str | None = None
+    agent_environment: str | None = None
     plan_id: str | None = None
     intent: str | None = None
     risk_level: str | None = None
@@ -253,6 +297,29 @@ class ReplaySummaryResponseModel(BaseModel):
     budget_status: str | None = None
     usage_summary: dict[str, Any] | None = None
     violations: list[str] | None = None
+
+
+class ReplayMismatchModel(BaseModel):
+    type: str
+    expected: str | None = None
+    actual: str | None = None
+    severity: str
+    reason: str
+
+
+class ReplayDiffResponseModel(BaseModel):
+    trace_id: str
+    plan_id: str | None = None
+    planned_tool: str | None = None
+    planned_intent: str | None = None
+    planned_capabilities: list[str] = Field(default_factory=list)
+    planned_risk_level: str | None = None
+    policy_decision: str | None = None
+    execution_outcome: str | None = None
+    governance_result: str
+    mismatches: list[ReplayMismatchModel] = Field(default_factory=list)
+    violations: list[str] = Field(default_factory=list)
+    summary: str
 
 
 @dataclass(slots=True)

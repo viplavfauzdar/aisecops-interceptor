@@ -125,23 +125,19 @@ When a material task is completed:
 
 ## Ownership
 
-Claude Code owns:
-- dashboard UI
-- visualizations
-- UX flows
-- screenshots
-
-Codex owns:
+The AI engineer may modify any part of the repository when required, including:
 - runtime engine
 - planning
 - policy engine
 - replay engine
 - MCP integration
 - local enforcement
+- dashboard UI
+- visualizations
 - documentation
 - release engineering
 
-Do not modify dashboard UI unless explicitly instructed.
+Avoid unnecessary UI churn. Prefer focused milestone-driven changes, and keep UI changes minimal unless they are directly required.
 
 
 ## Roadmap awareness

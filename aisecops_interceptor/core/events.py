@@ -45,6 +45,9 @@ class RuntimeEvent:
     stage: str | None = None
     context: RuntimeContext | None = None
     agent_name: str | None = None
+    agent_id: str | None = None
+    agent_trust_level: str | None = None
+    agent_environment: str | None = None
     tool_name: str | None = None
     allowed: bool | None = None
     arguments: dict[str, object] | None = None
@@ -138,6 +141,13 @@ class RuntimeEvent:
                 stage="tool",
                 context=context,
                 agent_name=str(data["agent_name"]) if data.get("agent_name") is not None else None,
+                agent_id=str(data["agent_id"]) if data.get("agent_id") is not None else None,
+                agent_trust_level=(
+                    str(data["agent_trust_level"]) if data.get("agent_trust_level") is not None else None
+                ),
+                agent_environment=(
+                    str(data["agent_environment"]) if data.get("agent_environment") is not None else None
+                ),
                 tool_name=str(data["tool_name"]) if data.get("tool_name") is not None else None,
                 allowed=is_allowed,
                 arguments=dict(data["arguments"]) if isinstance(data.get("arguments"), dict) else None,
@@ -227,6 +237,13 @@ class RuntimeEvent:
             stage=str(data["stage"]) if data.get("stage") is not None else None,
             context=context,
             agent_name=str(data["agent_name"]) if data.get("agent_name") is not None else None,
+            agent_id=str(data["agent_id"]) if data.get("agent_id") is not None else None,
+            agent_trust_level=(
+                str(data["agent_trust_level"]) if data.get("agent_trust_level") is not None else None
+            ),
+            agent_environment=(
+                str(data["agent_environment"]) if data.get("agent_environment") is not None else None
+            ),
             tool_name=str(data["tool_name"]) if data.get("tool_name") is not None else None,
             allowed=bool(data["allowed"]) if data.get("allowed") is not None else None,
             arguments=dict(data["arguments"]) if isinstance(data.get("arguments"), dict) else None,
@@ -285,6 +302,9 @@ class RuntimeEvent:
         event_type: str,
         decision: str,
         agent_name: str,
+        agent_id: str | None = None,
+        agent_trust_level: str | None = None,
+        agent_environment: str | None = None,
         tool_name: str | None = None,
         framework: str = "custom",
         actor: str | None = None,
@@ -351,6 +371,9 @@ class RuntimeEvent:
             stage=stage,
             context=context,
             agent_name=agent_name,
+            agent_id=agent_id,
+            agent_trust_level=agent_trust_level,
+            agent_environment=agent_environment,
             tool_name=tool_name,
             allowed=allowed,
             arguments=arguments,
@@ -426,6 +449,9 @@ class RuntimeEvent:
             stage="tool",
             context=context,
             agent_name=context.agent_name,
+            agent_id=context.agent_id,
+            agent_trust_level=context.agent_trust_level,
+            agent_environment=context.agent_environment,
             tool_name=context.tool_name,
             framework=context.framework,
             actor=context.actor,
@@ -512,6 +538,9 @@ class RuntimeEvent:
             stage=stage,
             context=context,
             agent_name=context.agent_name if context else None,
+            agent_id=context.agent_id if context else None,
+            agent_trust_level=context.agent_trust_level if context else None,
+            agent_environment=context.agent_environment if context else None,
             tool_name=context.tool_name if context else None,
             framework=context.framework if context else "custom",
             actor=context.actor if context else None,
@@ -599,6 +628,9 @@ class RuntimeEvent:
             stage=stage,
             context=context,
             agent_name=context.agent_name if context else "",
+            agent_id=context.agent_id if context else None,
+            agent_trust_level=context.agent_trust_level if context else None,
+            agent_environment=context.agent_environment if context else None,
             tool_name=context.tool_name if context else None,
             framework=context.framework if context else "custom",
             actor=context.actor if context else None,
