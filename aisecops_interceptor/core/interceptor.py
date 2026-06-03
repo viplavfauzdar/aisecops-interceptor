@@ -219,6 +219,8 @@ class AgentInterceptor:
         return self.evaluate(self.plan(request))
 
     def plan(self, request: InterceptionRequest) -> ExecutionPlan:
+        if hasattr(self.policy_engine, "enrich_context_with_agent_identity"):
+            self.policy_engine.enrich_context_with_agent_identity(request.context)
         request.context.ensure_trace_id()
         plan = ExecutionPlan(
             context=request.context,

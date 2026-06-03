@@ -11,6 +11,9 @@ if TYPE_CHECKING:
 @dataclass(slots=True)
 class RuntimeContext:
     agent_name: str | None = None
+    agent_id: str | None = None
+    agent_trust_level: str | None = None
+    agent_environment: str | None = None
     user_id: str | None = None
     session_id: str | None = None
     prompt: str | None = None
@@ -31,7 +34,7 @@ class RuntimeContext:
     runtime_budget: "RuntimeBudget | None" = None
     runtime_usage: "RuntimeUsage | None" = None
     tags: dict[str, str] = field(default_factory=dict)
-    metadata: dict[str, str] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         from aisecops_interceptor.core.models import InstructionProvenance, RuntimeBudget, RuntimeUsage

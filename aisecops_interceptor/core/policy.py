@@ -4,7 +4,7 @@ from typing import Any
 
 from aisecops_interceptor.core.context import RuntimeContext
 from aisecops_interceptor.core.cost import CostEstimator
-from aisecops_interceptor.core.models import PolicyDecision, RuntimeBudget, RuntimeUsage, ToolCall
+from aisecops_interceptor.core.models import AgentIdentity, PolicyDecision, RuntimeBudget, RuntimeUsage, ToolCall
 from aisecops_interceptor.policy.loader import PolicyLoader
 from aisecops_interceptor.policy.rule_engine import RuleEngine
 from aisecops_interceptor.policy.rules import Rule
@@ -157,6 +157,68 @@ class PolicyEngine:
             max_runtime_seconds=float(merged["max_runtime_seconds"]),
             max_cost_usd=float(merged["max_cost_usd"]),
         )
+
+    def agent_identity_for(self, agent_name: str | None) -> AgentIdentity | None:
+        if agent_name is None:
+            return None
+        agent_config = self.config.get("agents", {}).get(agent_name, {})
+        if not isinstance(agent_config, dict):
+            return None
+
+        identity_fields = {
+            "agent_id",
+            "trust_level",
+            "environment",
+            "allowed_capabilities",
+            "max_tool_calls",
+            "max_depth",
+            "max_runtime_seconds",
+            "max_cost_usd",
+        }
+        if not any(field in agent_config for field in identity_fields):
+            return None
+
+        return AgentIdentity(
+            agent_id=str(agent_config.get("agent_id") or agent_name),
+            agent_name=agent_name,
+            trust_level=str(agent_config.get("trust_level") or "unspecified"),
+            environment=str(agent_config.get("environment") or "dev"),
+            allowed_capabilities=[str(item) for item in agent_config.get("allowed_capabilities", [])],
+            max_tool_calls=(
+                int(agent_config["max_tool_calls"]) if agent_config.get("max_tool_calls") is not None else None
+            ),
+            max_depth=int(agent_config["max_depth"]) if agent_config.get("max_depth") is not None else None,
+            max_runtime_seconds=(
+                float(agent_config["max_runtime_seconds"])
+                if agent_config.get("max_runtime_seconds") is not None
+                else None
+            ),
+            max_cost_usd=(
+                float(agent_config["max_cost_usd"]) if agent_config.get("max_cost_usd") is not None else None
+            ),
+        )
+
+    def enrich_context_with_agent_identity(self, context: RuntimeContext) -> RuntimeContext:
+        identity = self.agent_identity_for(context.agent_name)
+        if identity is None:
+            return context
+
+        context.agent_id = context.agent_id or identity.agent_id
+        context.agent_trust_level = context.agent_trust_level or identity.trust_level
+        context.agent_environment = context.agent_environment or identity.environment
+        context.environment = context.environment or identity.environment
+        if context.allowed_capabilities is None and identity.allowed_capabilities:
+            context.allowed_capabilities = list(identity.allowed_capabilities)
+        context.metadata.setdefault("agent_identity", identity.to_dict())
+        if identity.runtime_budget_overrides() and context.runtime_budget is None:
+            base_budget = self.runtime_budget_for_agent(context.agent_name)
+            context.runtime_budget = RuntimeBudget(
+                max_tool_calls=base_budget.max_tool_calls,
+                max_depth=base_budget.max_depth,
+                max_runtime_seconds=base_budget.max_runtime_seconds,
+                max_cost_usd=base_budget.max_cost_usd,
+            )
+        return context
 
     def runtime_usage_for_context(
         self,

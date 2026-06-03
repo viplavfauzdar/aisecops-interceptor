@@ -39,6 +39,9 @@ class ReplayTimelineEntry:
     reason: str | None
     provenance: list[InstructionProvenance]
     execution_plan_id: str | None
+    agent_id: str | None = None
+    agent_trust_level: str | None = None
+    agent_environment: str | None = None
     plan_id: str | None = None
     plan_intent: str | None = None
     plan_risk_level: str | None = None
@@ -69,6 +72,9 @@ class ReplayTimelineEntry:
             event_id=event.event_id,
             decision_stage=event.decision_stage,
             agent_name=event.agent_name,
+            agent_id=event.agent_id,
+            agent_trust_level=event.agent_trust_level,
+            agent_environment=event.agent_environment,
             tool_name=event.tool_name,
             decision=event.decision,
             reason=event.reason,
@@ -114,6 +120,9 @@ class ReplaySummary:
     final_reason: str | None
     provenance_trust_summary: dict[str, int]
     schema_versions_observed: list[str]
+    agent_id: str | None = None
+    agent_trust_level: str | None = None
+    agent_environment: str | None = None
     plan_id: str | None = None
     intent: str | None = None
     risk_level: str | None = None
@@ -140,6 +149,9 @@ class ReplayTraceResult:
     provenance_summary: dict[str, int]
     final_decision: str | None
     final_reason: str | None
+    agent_id: str | None = None
+    agent_trust_level: str | None = None
+    agent_environment: str | None = None
     plan_id: str | None = None
     intent: str | None = None
     risk_level: str | None = None
@@ -212,6 +224,16 @@ class AuditReplayEngine:
         schema_versions: list[str] = []
         seen_versions: set[str] = set()
         plan_entry = next((entry for entry in timeline.entries if entry.plan_id is not None), None)
+        identity_entry = next(
+            (
+                entry
+                for entry in reversed(timeline.entries)
+                if entry.agent_id is not None
+                or entry.agent_trust_level is not None
+                or entry.agent_environment is not None
+            ),
+            None,
+        )
         protocol_entry = next((entry for entry in reversed(timeline.entries) if entry.protocol is not None), None)
         usage_entry = next((entry for entry in reversed(timeline.entries) if entry.runtime_usage is not None), None)
         violations: list[str] = []
@@ -232,6 +254,9 @@ class AuditReplayEngine:
             event_count=len(timeline.entries),
             final_decision=final_entry.decision if final_entry is not None else None,
             tool_name=final_entry.tool_name if final_entry is not None else None,
+            agent_id=identity_entry.agent_id if identity_entry is not None else None,
+            agent_trust_level=identity_entry.agent_trust_level if identity_entry is not None else None,
+            agent_environment=identity_entry.agent_environment if identity_entry is not None else None,
             final_reason=final_entry.reason if final_entry is not None else None,
             provenance_trust_summary=trust_summary,
             schema_versions_observed=schema_versions,
@@ -278,6 +303,9 @@ class AuditReplayEngine:
             provenance_summary=summary.provenance_trust_summary,
             final_decision=summary.final_decision,
             final_reason=summary.final_reason,
+            agent_id=summary.agent_id,
+            agent_trust_level=summary.agent_trust_level,
+            agent_environment=summary.agent_environment,
             plan_id=summary.plan_id,
             intent=summary.intent,
             risk_level=summary.risk_level,

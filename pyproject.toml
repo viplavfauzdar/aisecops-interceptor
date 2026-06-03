@@ -50,6 +50,7 @@ dev = [
 ]
 
 [project.scripts]
+aisecops-evidence = "aisecops_interceptor.evidence.cli:main"
 aisecops-local = "aisecops_interceptor.local.cli:main"
 aisecops-mcp-proxy = "aisecops_interceptor.mcp.proxy:main"
 aisecops-replay = "aisecops_interceptor.replay.cli:main"

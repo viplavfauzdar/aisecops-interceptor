@@ -433,6 +433,44 @@ Future work will add full MCP gateway mode.
 
 ---
 
+## Runtime Governance Platform
+
+The v1.0.0 foundation ties plan extraction, policy decisions, runtime usage, replay, MCP, and local enforcement into governance evidence for agentic AI systems.
+
+It adds:
+
+- Replay Diff Engine to compare planned intent, policy decisions, and execution outcomes
+- Agent Identity Layer for trust level, environment, capabilities, and agent-specific runtime limits
+- Compliance Evidence Export for JSON and Markdown evidence packages
+- Risk Explanation helpers for human-readable governance summaries
+- continued Local Enforcement Mode and MCP Policy Proxy support
+
+Replay diff CLI:
+
+```bash
+python -m aisecops_interceptor.replay.diff \
+  --trace-id TRACE_ID \
+  --audit-log ./audit.jsonl
+```
+
+Evidence export CLI:
+
+```bash
+python -m aisecops_interceptor.evidence.cli \
+  --trace-id TRACE_ID \
+  --audit-log ./audit.jsonl \
+  --format markdown \
+  --output evidence.md
+```
+
+Replay diff API:
+
+```http
+GET /replay/{trace_id}/diff
+```
+
+---
+
 # High-level architecture
 
 At a high level, AISecOps Interceptor sits in the missing control plane layer between agent frameworks and real execution.

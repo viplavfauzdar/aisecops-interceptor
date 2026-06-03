@@ -26,6 +26,7 @@ from aisecops_interceptor.core.models import (
 )
 from aisecops_interceptor.core.policy import PolicyEngine
 from aisecops_interceptor.integrations.openclaw_adapter import OpenClawToolRunnerAdapter
+from aisecops_interceptor.replay.diff import ReplayDiffEngine
 from aisecops_interceptor.replay.engine import AuditFileNotFoundError, AuditReplayEngine, TraceNotFoundError
 from aisecops_interceptor import __version__
 
@@ -49,6 +50,7 @@ interceptor = AgentInterceptor(
 )
 openclaw_adapter = OpenClawToolRunnerAdapter(interceptor=interceptor)
 replay_engine = AuditReplayEngine()
+replay_diff_engine = ReplayDiffEngine(replay_engine)
 
 
 def read_customer(customer_id: str) -> dict[str, str]:
@@ -578,6 +580,9 @@ def _replay_timeline_entry_payload(entry) -> ReplayTimelineEntryModel:
         event_id=entry.event_id,
         decision_stage=entry.decision_stage,
         agent_name=entry.agent_name,
+        agent_id=entry.agent_id,
+        agent_trust_level=entry.agent_trust_level,
+        agent_environment=entry.agent_environment,
         tool_name=entry.tool_name,
         decision=entry.decision,
         reason=entry.reason,
@@ -733,6 +738,9 @@ def replay_trace_list(
                         "risk_level": summary.risk_level,
                         "requested_capabilities": summary.requested_capabilities,
                         "step_count": summary.step_count,
+                        "agent_id": summary.agent_id,
+                        "agent_trust_level": summary.agent_trust_level,
+                        "agent_environment": summary.agent_environment,
                         "protocol": summary.protocol,
                         "client_id": summary.client_id,
                         "server_name": summary.server_name,
@@ -741,7 +749,12 @@ def replay_trace_list(
                         "usage_summary": summary.usage_summary,
                         "violations": summary.violations,
                     }
-                    if summary.plan_id is not None or summary.usage_summary is not None or summary.protocol is not None
+                    if (
+                        summary.plan_id is not None
+                        or summary.usage_summary is not None
+                        or summary.protocol is not None
+                        or summary.agent_id is not None
+                    )
                     else {}
                 ),
             }
@@ -774,6 +787,9 @@ def replay_trace(trace_id: str):
         provenance_summary=result.provenance_summary,
         final_decision=result.final_decision,
         final_reason=result.final_reason,
+        agent_id=result.agent_id,
+        agent_trust_level=result.agent_trust_level,
+        agent_environment=result.agent_environment,
         plan_id=result.plan_id,
         intent=result.intent,
         risk_level=result.risk_level,
@@ -810,6 +826,9 @@ def replay_trace_summary(trace_id: str):
         final_reason=summary.final_reason,
         provenance_trust_summary=summary.provenance_trust_summary,
         schema_versions_observed=summary.schema_versions_observed,
+        agent_id=summary.agent_id,
+        agent_trust_level=summary.agent_trust_level,
+        agent_environment=summary.agent_environment,
         plan_id=summary.plan_id,
         intent=summary.intent,
         risk_level=summary.risk_level,
@@ -823,6 +842,15 @@ def replay_trace_summary(trace_id: str):
         usage_summary=summary.usage_summary,
         violations=summary.violations or None,
     ).model_dump(exclude_none=True)
+
+
+@app.get("/replay/{trace_id}/diff")
+def replay_trace_diff(trace_id: str) -> dict:
+    try:
+        diff = replay_diff_engine.diff_trace(replay_audit_file_path(), trace_id)
+    except (AuditFileNotFoundError, TraceNotFoundError) as exc:
+        return _replay_not_found_response(str(exc))
+    return diff.to_dict()
 
 
 
